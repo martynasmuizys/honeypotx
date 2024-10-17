@@ -1,16 +1,30 @@
-use std::{os::fd::AsFd, path::Path, sync::{Arc, Mutex}, thread, time::Duration};
+mod app;
+mod helpers;
+mod maps;
+mod objects;
+mod programs;
 
-use anyhow::{anyhow, Context};
+use std::{
+    path::Path,
+    sync::{Arc, Mutex},
+    thread,
+    time::Duration,
+};
+
+use app::App;
+
+use anyhow::Context;
 use clap::Parser;
-use libbpf_rs::{MapCore, MapFlags, ObjectBuilder, Xdp, XdpFlags};
-use pnet::datalink::{self, NetworkInterface};
+use libbpf_rs::{
+    MapCore, MapFlags, ObjectBuilder,
+};
 use tokio::signal;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
-struct Options {
+pub struct Options {
     /// Interface name.
-    #[arg(short, long, default_value = "lo")]
+    #[arg(short, long, default_value = "eth0")]
     iface: String,
     /// XdpFlags to pass to XDP framework. Available options: generic, native, offloaded.
     #[arg(long, default_value = "generic")]
@@ -19,74 +33,78 @@ struct Options {
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    let should_terminate = Arc::new(Mutex::new(false));
-    signal_handler(should_terminate.clone());
     let options = Options::parse();
 
-    // TODO: increase rlimit? sudo cargo automatically does this?.
+    // increase rlimit? sudo cargo automatically does this?.
     //rlimit::increase_nofile_limit(rlimit::INFINITY)?;
     let mut object_builder = ObjectBuilder::default();
     let path = Path::new("./src/bpf/xdp.o");
-    let open_object = object_builder
-        .open_file(path)
-        .with_context(|| format!("Failed to open object file {:?}", path))?;
-    let object = open_object
-        .load()
-        .with_context(|| format!("Failed to load BPF program"))?;
+    let object = objects::get_object(&mut object_builder, path)?;
 
-    // this works for now because we only have 1 program and 1 map
-    let mut map = object.maps().peekable();
-    let map = map.peek().unwrap();
-    let mut program = object.progs().peekable();
-    let program = program.peek().unwrap();
-    let xdp = Xdp::new(program.as_fd());
-    xdp.attach(
-        iface_to_idx(&options.iface)?,
-        get_xdp_flags(&options.xdp_flags)?,
-    )
-    .with_context(|| format!("Failed to attach BPF program to XDP"))?;
+    let map = maps::get_map(&object, "packet_count").with_context(|| format!("Map not found!"))?;
+    let programs = programs::get_programs(&object).with_context(|| format!("Program not found"))?;
 
-    //this should be different
-    while !(*should_terminate.lock().unwrap()) {
-        let key: u32 = 127 << 24 | 0 << 16 | 0 << 8 | 1 << 0;
-        // to_be_bytes converts to [127, 0, 0, 1]
-        println!("{:?}", map.lookup(&key.to_be_bytes(), MapFlags::ANY));
-        thread::sleep(Duration::from_secs(5));
-    }
-    // 1: lo -> ip link show
-    xdp.detach(
-        iface_to_idx(&options.iface)?,
-        get_xdp_flags(&options.xdp_flags)?,
-    )
-    .with_context(|| format!("Failed to detach BPF program from XDP"))?;
-    Ok(())
-}
+    let program = programs
+        .get("hello_packets")
+        .with_context(|| format!("Program does not exist"))?;
+    let xdp = programs::attach_xdp(&program, &options)?;
 
-fn signal_handler(signal: Arc<Mutex<bool>>) {
-    // what if user presses ctrl-z? xdp program wont be detached or what?
+    // TUI
+    //let mut terminal = ratatui::init();
+    //terminal.clear()?;
+    //
+    //let mut app = App::new(map, xdp, options);
+    //let app_result = app.run(&mut terminal);
+    //ratatui::restore();
+    //
+    //Ok(app_result?)
+
+    let should_terminate = Arc::new(Mutex::new(false));
+    let signal_handle = should_terminate.clone();
     tokio::spawn(async move {
         signal::ctrl_c().await.unwrap();
-        let mut signal = signal.lock().unwrap();
-        *signal = true;
+        let mut signal_handle = signal_handle.lock().unwrap();
+        *signal_handle = true;
         println!("\rTerminating...");
     });
-}
 
-/// Turns interface name into corresponding index number.
-fn iface_to_idx(iface: &str) -> Result<i32, anyhow::Error> {
-    let interfaces: Vec<NetworkInterface> = datalink::interfaces();
-    for i in interfaces {
-        if iface.to_lowercase() == i.name {
-            return Ok(i.index as i32);
-        }
+    while !(*should_terminate.lock().unwrap()) {
+        let key: u32 = 127 << 24 | 0 << 16 | 0 << 8 | 1 << 0;
+        let mut total_packets: u64 = 0;
+        // to_be_bytes converts to [127, 0, 0, 1]
+        match map.lookup(&key.to_be_bytes(), MapFlags::ANY) {
+            Ok(e) => {
+                let som = e.unwrap_or(Vec::new());
+                if som.len() != 0 {
+                    let mut shift: u64 = 0;
+                    for b in &som[0..8] {
+                        if *b != 0 {
+                            let num = *b as u64;
+                            total_packets += num << shift;
+                            shift += 8;
+                        }
+                    }
+                    let mut time: u64 = 0;
+                    let mut shift: u64 = 0;
+                    for b in &som[8..16] {
+                        if *b != 0 {
+                            let num = *b as u64;
+                            time += num << shift;
+                            shift += 8;
+                        }
+                    }
+                    println!(
+                        "Last accessed at (secs since boot): {}",
+                        time / 10_u64.pow(9)
+                    );
+                    println!("Total packets: {}", total_packets);
+                    thread::sleep(Duration::from_secs(2));
+                }
+            }
+            Err(_) => panic!(),
+        };
     }
-    return Err(anyhow!("Interface not found"));
-}
 
-/// Turns XDP flag into corresponding type.
-fn get_xdp_flags(flags: &str) -> Result<XdpFlags, anyhow::Error> {
-    match flags {
-        "generic" => return Ok(XdpFlags::SKB_MODE),
-        _ => return Err(anyhow!("Flag not found!")),
-    }
+    programs::detach_xdp(&xdp, &options)?;
+    Ok(())
 }
