@@ -1,8 +1,16 @@
 // clang-format off
 #include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
-#include "xdp_common.h"
 // clang-format on
+
+struct Data {
+    __u32 ip;
+    bool ban;
+	__u64 rx_packets;
+    __u64 last_access_ns;
+};
+
+static __u64 MS_IN_NS = 1000000;
 
 struct {
 	__uint(type, BPF_MAP_TYPE_LRU_HASH);
@@ -45,7 +53,7 @@ int hello_packets(struct xdp_md *ctx) {
     // Extract source IP address
     __u32 src_ip = ip->saddr;
 
-    if (bpf_map_lookup_elem(&blacklist, &src_ip)) {
+    if (((struct Data *)bpf_map_lookup_elem(&blacklist, &src_ip))->ban) {
         return XDP_DROP;
     }
 
@@ -57,21 +65,16 @@ int hello_packets(struct xdp_md *ctx) {
                8080 // need to learn to work with tcp packets
     );
 
-    struct Data *packets = bpf_map_lookup_elem(&packet_count, &src_ip);
+    struct Data *ip_data = bpf_map_lookup_elem(&packet_count, &src_ip);
 
-    if (packets) {
-        __u64 time = (__u64)2 * SEC_IN_NS;
-        bpf_printk("minTime: %llu", time);
-        bpf_printk("Time - minTime: %llu", bpf_ktime_get_ns() - packets->last_access_ns);
-        bpf_printk("Time since boot: %llu", bpf_ktime_get_ns());
-        bpf_printk("Last access time: %llu", packets->last_access_ns);
-        if (bpf_ktime_get_ns() - packets->last_access_ns < time) {
+    if (ip_data) {
+        __u64 time = (__u64)2000 * MS_IN_NS;
+        if (bpf_ktime_get_ns() - ip_data->last_access_ns < time) {
             bool ban = true;
-            bpf_printk("BANAN!");
             bpf_map_update_elem(&blacklist, &src_ip, &ban, BPF_NOEXIST);
         }
-        __sync_fetch_and_add(&packets->rx_packets, 1);
-        __sync_fetch_and_add(&packets->last_access_ns, bpf_ktime_get_ns() - packets->last_access_ns);
+        __sync_fetch_and_add(&ip_data->rx_packets, 1);
+        __sync_fetch_and_add(&ip_data->last_access_ns, bpf_ktime_get_ns() - ip_data->last_access_ns);
     } else {
         struct Data new = {1, bpf_ktime_get_ns()};
         bpf_map_update_elem(&packet_count, &src_ip, &new, BPF_NOEXIST);

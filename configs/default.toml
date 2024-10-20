@@ -1,0 +1,13 @@
+[init]
+name = "Example"
+frequency = 1000 # in ms
+
+[init.whitelist]
+enabled = false
+max = 32
+action = "allow"
+
+[init.blacklist]
+enabled = false
+max = 32
+action = "deny"

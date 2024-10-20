@@ -1,0 +1,14 @@
+[init]
+name = "bananer"
+frequency = 1000 # in ms
+
+[init.whitelist]
+enabled = true
+max = 32
+action = "allow"
+
+[init.blacklist]
+enabled = true
+max = 64
+action = "deny"
+

@@ -11,4 +11,6 @@ libbpf-rs = "0.24.5"
 pnet = "0.35.0"
 ratatui = "0.28.1"
 rlimit = "0.10.2"
+serde = { version = "1.0.210", features = ["derive"] }
 tokio = { version = "1.40.0", features = ["full"] }
+toml = "0.8.19"
