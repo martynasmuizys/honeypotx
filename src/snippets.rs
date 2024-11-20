@@ -6,7 +6,6 @@ pub static BASE: &str = "// clang-format off
 
 struct Data {
     __u32 ip;
-    bool ban;
 	__u64 rx_packets;
     __u64 last_access_ns;
 };
@@ -26,14 +25,18 @@ int {{name}}(struct xdp_md *ctx) {
 
     // Check Ethernet header size
     if (data + sizeof(struct ethhdr) > data_end)
-        return XDP_DROP;
+        return XDP_PASS;
 
     struct ethhdr *eth = data;
 
     // Check IP header size
     struct iphdr *ip = data + sizeof(struct ethhdr);
     if (data + sizeof(struct ethhdr) + sizeof(struct iphdr) > data_end)
-        return XDP_DROP;
+        return XDP_PASS;
+
+    if(ip->protocol != IPPROTO_TCP) {
+        return XDP_PASS;
+    }
 
     // Extract source IP address
     __u32 src_ip = ip->saddr;
@@ -42,8 +45,7 @@ int {{name}}(struct xdp_md *ctx) {
 
     {{blacklist_action}}
 
-    // Collect data about graylist?
-    // apply frequency actions?
+    {{graylist_action}}
 
     return XDP_PASS;
 }
@@ -61,26 +63,27 @@ pub static MAP: &str = "struct {
 } {{name}} SEC(\".maps\");
 ";
 
-/// Allow/Deny action
-pub static ACTION: &str = "struct Data *{{list}}_data = bpf_map_lookup_elem(&{{list}}, &src_ip);
-	if ({{list}}_data) {
+/// Get ip data
+pub static GET_DATA: &str = "struct Data *{{list}}_data = bpf_map_lookup_elem(&{{list}}, &src_ip);";
+
+/// Allow/Deny action (for whitelist/blacklist)
+pub static ACTION: &str = "if ({{list}}_data) {
 		return {{action}};
 	}
 ";
 
-/// Investigate action
-pub static INVESTIGATE: &str = "struct Data *ip_data = bpf_map_lookup_elem(&{{list}}, &src_ip);
-
-if (ip_data) {
+/// Investigate action (for graylist)
+pub static GRAYLIST: &str = "if ({{list}}_data) {
     __u64 time = (__u64){{frequency}} * MS_IN_NS;
-    if (bpf_ktime_get_ns() - ip_data->last_access_ns < time) {
-        bool ban = true;
-        bpf_map_update_elem(&{{list}}, &src_ip, &ban, BPF_NOEXIST);
+    if (bpf_ktime_get_ns() - {{list}}_data->last_access_ns < time) {
+        struct Data new = {src_ip, {{list}}_data->rx_packets, bpf_ktime_get_ns()};
+        bpf_map_update_elem(&blacklist, &src_ip, &new, BPF_NOEXIST);
+        return XDP_DROP;
     }
-    __sync_fetch_and_add(&ip_data->rx_packets, 1);
-    __sync_fetch_and_add(&ip_data->last_access_ns, bpf_ktime_get_ns() - ip_data->last_access_ns);
+    __sync_fetch_and_add(&{{list}}_data->rx_packets, 1);
+    __sync_fetch_and_add(&{{list}}_data->last_access_ns, bpf_ktime_get_ns() - {{list}}_data->last_access_ns);
 } else {
-    struct Data new = {1, bpf_ktime_get_ns()};
+    struct Data new = {src_ip, 1, bpf_ktime_get_ns()};
     bpf_map_update_elem(&{{list}}, &src_ip, &new, BPF_NOEXIST);
 }
 ";

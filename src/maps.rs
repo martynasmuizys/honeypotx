@@ -5,7 +5,7 @@ pub fn get_map<'a>(object: &'a Object, name: &'a str) -> Option<MapImpl<'a>> {
 
     for m in maps {
         if m.name() == name {
-            return Some(m)
+            return Some(m);
         }
     }
 

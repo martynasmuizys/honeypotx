@@ -11,7 +11,7 @@ docker_build:
 	docker run --privileged -it --name hpx hpx:latest
 
 build:
-	clang -O2 -g -target bpf -c src/bpf/xdp.c -o src/bpf/xdp.o
+	clang -O2 -g -target bpf -c src/bpf/generated.c -o src/bpf/generated.o
 	cargo build
 
 run_docker:

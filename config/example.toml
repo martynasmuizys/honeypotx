@@ -1,0 +1,32 @@
+# Initial values
+[init]
+# Name of eBPF program
+name = "Example"
+# Optional. Defaults to local machine
+hostname = "100.0.0.10"
+# Optional. Defaults to 22
+port = 22
+# Network interface
+iface = "eth0"
+# Username of user (sudoer)
+username = "bobthebuilder" # Username of user (sudoer)
+
+# Not mandatory section
+[init.whitelist]
+# Enable or disable whitelist
+enabled = false
+# How many whitelisted addresses to keep? will change this to be dynamic with file or smth
+max = 32
+# what to do with addresses that are in this list (allow, deny, investigate (graylist only))
+action = "allow"
+
+[init.blacklist]
+enabled = false
+max = 32
+action = "deny"
+
+[init.blacklist]
+enabled = false
+max = 32
+frequency = 1000 # How fast packets can be sent in ms. (graylist only)
+action = "investigate"

@@ -1,6 +1,6 @@
+use anyhow::anyhow;
 use libbpf_rs::XdpFlags;
 use pnet::datalink::{self, NetworkInterface};
-use anyhow::anyhow;
 
 /// Turns interface name into corresponding index number.
 pub fn iface_to_idx(iface: &str) -> Result<i32, anyhow::Error> {

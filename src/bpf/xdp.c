@@ -5,7 +5,6 @@
 
 struct Data {
     __u32 ip;
-    bool ban;
 	__u64 rx_packets;
     __u64 last_access_ns;
 };
@@ -25,6 +24,17 @@ struct {
 	__type(value, bool);
 	__uint(max_entries, sizeof(__u64));
 } blacklist SEC(".maps");
+
+static bool DEBUG = true;
+
+void debug(const char *msg[], __u32 src_ip) {
+    bpf_trace_printk(*msg, sizeof(*msg),
+               (src_ip >> 0) & 0xFF,
+               (src_ip >> 8) & 0xFF,
+               (src_ip >> 16) & 0xFF,
+               (src_ip >> 24) & 0xFF
+    );
+}
 
 SEC("xdp")
 int hello_packets(struct xdp_md *ctx) {
@@ -52,17 +62,17 @@ int hello_packets(struct xdp_md *ctx) {
 
     // Extract source IP address
     __u32 src_ip = ip->saddr;
+    debug("Received packet from IP: %d.%d.%d.%d\n", src_ip);
 
     if (((struct Data *)bpf_map_lookup_elem(&blacklist, &src_ip))->ban) {
         return XDP_DROP;
     }
 
-    bpf_printk("Received packet from IP: %d.%d.%d.%d\nPort: %d",
+    bpf_printk("Received packet from IP: %d.%d.%d.%d\n",
                (src_ip >> 0) & 0xFF,
                (src_ip >> 8) & 0xFF,
                (src_ip >> 16) & 0xFF,
-               (src_ip >> 24) & 0xFF,
-               8080 // need to learn to work with tcp packets
+               (src_ip >> 24) & 0xFF
     );
 
     struct Data *ip_data = bpf_map_lookup_elem(&packet_count, &src_ip);
