@@ -1,0 +1,25 @@
+{
+    "init": {
+        "name": "Example",
+        "hostname": "100.0.0.10",
+        "port": "22",
+        "iface": "eth0",
+        "username": "bobthebuilder",
+        "blacklist": {
+            "enabled": false,
+            "max": 32,
+            "action": "deny"
+        },
+        "whitelist": {
+            "enabled": false,
+            "max": 32,
+            "action": "allow"
+        },
+        "graylist": {
+            "enabled": false,
+            "max": 32,
+            "action": "investigate",
+            "frequency": 1000
+        }
+    }
+}
