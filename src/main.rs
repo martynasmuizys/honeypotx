@@ -18,11 +18,7 @@ use engine::generator;
 use home::home_dir;
 use load::load;
 use lua::run_script;
-use mlua::Lua;
-use std::cell::RefCell;
-use std::fs::{self};
-use std::io::Read;
-use std::rc::Rc;
+use std::fs;
 use std::{
     path::{Path, PathBuf},
     process::Command,
@@ -72,16 +68,13 @@ pub struct Unload {
     xdp_flags: String,
 }
 
-#[derive(Args, Debug)]
-pub struct Secret {}
-
 #[derive(Debug, Subcommand)]
 enum Commands {
     /// Generates eBPF program on provided or default config
     Generate(Generate),
     Load(Load),
     Analyze(Analyze),
-    Secret(Secret),
+    SecretDoNotRunThis,
     Run(Run),
 }
 
@@ -161,7 +154,7 @@ async fn main() -> Result<(), anyhow::Error> {
         Commands::Generate(options) => generator(options, config)?,
         Commands::Analyze(options) => analyze(options, config)?,
         Commands::Load(mut options) => load(&mut options, config).await?,
-        Commands::Secret(_) => secret::secret(),
+        Commands::SecretDoNotRunThis => secret::secret(),
         Commands::Run(options) => {
             let result = run_script(
                 WORKING_DIR

@@ -1,15 +1,13 @@
-use std::fs::create_dir_all;
-use std::io::{self, prelude::*};
+use std::io::{self, Read, Write};
 use std::net::TcpStream;
-use std::path::Path;
 use std::process::Command;
 
-use anyhow::{anyhow, Context, Ok};
+use anyhow::anyhow;
 use crossterm::style::Stylize;
 use ssh2::Session;
 
 use crate::config::Config;
-use crate::{Analyze, WORKING_DIR};
+use crate::Analyze;
 
 static MIN_KERNEL_VERSION: &str = "5.16.0";
 static UBUNTU_PACKAGES: [&str; 4] = [

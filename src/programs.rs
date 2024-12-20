@@ -5,7 +5,7 @@ use libbpf_rs::{Object, ProgramImpl, Xdp};
 
 use crate::{helpers, Load};
 
-pub fn get_programs<'a>(object: &'a Object) -> Option<HashMap<String, ProgramImpl>> {
+pub fn get_programs<'a>(object: &'a Object) -> Option<HashMap<String, ProgramImpl<'a>>> {
     let programs = object.progs();
     let mut ret: HashMap<String, ProgramImpl> = HashMap::new();
 
