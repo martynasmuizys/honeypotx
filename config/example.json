@@ -3,8 +3,9 @@
         "name": "Example",
         "hostname": "100.0.0.10",
         "port": 22,
-        "iface": "eth0",
         "username": "bobthebuilder",
+        "iface": "eth0",
+        "prog_type": "ip",
         "blacklist": {
             "enabled": false,
             "max": 32,

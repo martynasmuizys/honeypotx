@@ -12,38 +12,42 @@ static DEFAULT_WHITELIST_ACTION: &str = "allow";
 static DEFAULT_BLACKLIST_ACTION: &str = "deny";
 static DEFAULT_GRAYLIST_ACTION: &str = "investigate";
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Config {
     pub init: Option<Init>,
+    pub whitelist: Option<Vec<String>>,
+    pub blacklist: Option<Vec<String>>,
+    pub graylist: Option<Vec<String>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Init {
     pub name: Option<String>,
     pub hostname: Option<String>,
     pub port: Option<u16>,
     pub iface: Option<String>,
     pub username: Option<String>,
+    pub prog_type: Option<String>,
     pub whitelist: Option<Whitelist>,
     pub blacklist: Option<Blacklist>,
     pub graylist: Option<Graylist>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Whitelist {
     pub enabled: Option<bool>,
     pub max: Option<u32>,
     pub action: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Blacklist {
     pub enabled: Option<bool>,
     pub max: Option<u32>,
     pub action: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Graylist {
     pub enabled: Option<bool>,
     pub max: Option<u32>,
@@ -55,6 +59,9 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             init: Some(Init::default()),
+            whitelist: None,
+            blacklist: None,
+            graylist: None,
         }
     }
 }
@@ -63,7 +70,7 @@ impl Display for Config {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            " - Hostname: {}\n - Port: {}\n - Network Interface: {}\n - Username: {}\n - eBPF Program Name: {}\n - Lists:\n      {}: \n{}      {}: \n{}      {}: \n{}",
+            "├─ Hostname: {}\n├─ Port: {}\n├─ Username: {}\n├─ Network Interface: {}\n├─ eBPF Program Type: {} \n├─ eBPF Program Name: {}\n├─ Maps:\n├─── {}: \n{}├─── {}: \n{}└─── {}: \n{}",
             self.init
                 .as_ref()
                 .unwrap()
@@ -85,6 +92,15 @@ impl Display for Config {
             self.init
                 .as_ref()
                 .unwrap()
+                .username
+                .as_ref()
+                .unwrap_or(&"-".to_string())
+                .as_str()
+                .green()
+                .bold(),
+            self.init
+                .as_ref()
+                .unwrap()
                 .iface
                 .as_ref()
                 .unwrap_or(&DEFAULT_NET_IFACE.to_string())
@@ -94,9 +110,10 @@ impl Display for Config {
             self.init
                 .as_ref()
                 .unwrap()
-                .username
+                .prog_type
                 .as_ref()
-                .unwrap_or(&"-".to_string())
+                .unwrap_or(&"ip".to_string())
+                .to_uppercase()
                 .as_str()
                 .green()
                 .bold(),
@@ -138,7 +155,7 @@ impl Display for Blacklist {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "         * Enabled: {}\n         * Max IPs: {}\n         * Action: {}\n",
+            "│       ├─ Enabled: {}\n│       ├─ Max IPs: {}\n│       └─ Action: {}\n",
             self.enabled
                 .as_ref()
                 .unwrap_or(&false)
@@ -165,7 +182,7 @@ impl Display for Whitelist {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "         * Enabled: {}\n         * Max IPs: {}\n         * Action: {}\n",
+            "│       ├─ Enabled: {}\n│       ├─ Max IPs: {}\n│       └─ Action: {}\n",
             self.enabled
                 .as_ref()
                 .unwrap_or(&false)
@@ -192,7 +209,7 @@ impl Display for Graylist {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "         * Enabled: {}\n         * Max IPs: {}\n         * Action: {}\n         * Frequency: {}\n",
+            "        ├─ Enabled: {}\n        ├─ Max IPs: {}\n        ├─ Action: {}\n        └─ Frequency: {}\n",
             self.enabled
                 .as_ref()
                 .unwrap_or(&false)
@@ -229,6 +246,7 @@ impl Default for Init {
             port: None,
             iface: Some(DEFAULT_NET_IFACE.to_string()),
             username: None,
+            prog_type: Some("ip".to_string()),
             whitelist: Some(Whitelist::default()),
             blacklist: Some(Blacklist::default()),
             graylist: Some(Graylist::default()),

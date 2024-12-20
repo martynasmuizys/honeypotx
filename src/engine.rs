@@ -1,12 +1,39 @@
+use core::panic;
 use std::{
     fs::File,
-    io::{self, Write},
+    io::{self, Write}, path::Path, process::Command,
 };
+
+use anyhow::{anyhow, Context};
 
 use crate::{
     config::{Config, Init, List, DEFAULT_FREQUENCY},
-    snippets::{ACTION, BASE, GET_DATA, GRAYLIST, MAP},
+    snippets::{ACTION, BASE_DNS, BASE_IP, GET_DATA_DNS, GET_DATA_IP, GRAYLIST, MAP}, Generate, WORKING_DIR,
 };
+
+pub fn generator(_options: Generate, config: Config) -> Result<(), anyhow::Error> {
+    let out = format!(
+        "{}/out/generated.c",
+        WORKING_DIR
+            .to_str()
+            .with_context(|| format!("Failed to parse HOME directory"))?
+    );
+    let path = Path::new(&out);
+    let out_file = File::create(path)?;
+    generate(config, out_file)?;
+    Command::new("clang-format").arg("-i").arg(path).spawn()?;
+    Command::new("clang")
+        .arg("-O2")
+        .arg("-g")
+        .arg("-target")
+        .arg("bpf")
+        .arg("-c")
+        .arg(path)
+        .arg("-o")
+        .arg("/tmp/generated.o")
+        .spawn()?;
+    Ok(())
+}
 
 // should have written a library to do most of this stuff... like finding patters and changing
 // them... idk future work maybe. also unwraping then taking as ref then unwraping again is so
@@ -14,9 +41,25 @@ use crate::{
 // seperate generator functions, f.e. frequency, dns(? wip), other that would allow more
 // features/configuration
 pub fn generate(config: Config, out_file: File) -> Result<(), anyhow::Error> {
-    let mut writer = io::BufWriter::new(out_file);
+    match config.init.as_ref().unwrap().prog_type.as_ref() {
+        Some(t) => match t.as_str() {
+            "ip" => {
+                generate_program(config, out_file, BASE_IP)?;
+            }
+            "dns" => {
+                generate_program(config, out_file, BASE_DNS)?;
+            }
+            _ => return Err(anyhow!("Unknown program type")),
+        },
+        None => generate_program(config, out_file, BASE_IP)?,
+    }
+    Ok(())
+}
 
-    for line in BASE.lines() {
+fn generate_program(config: Config, out: File, prog_base: &str) -> Result<(), anyhow::Error> {
+    let mut writer = io::BufWriter::new(out);
+
+    for line in prog_base.lines() {
         match line.find("{{") {
             Some(start) => match line.find("}}") {
                 Some(end) => {
@@ -107,6 +150,13 @@ pub fn generate(config: Config, out_file: File) -> Result<(), anyhow::Error> {
                                 continue;
                             }
                             parsed_line = replace_wb_action(
+                                config
+                                    .init
+                                    .as_ref()
+                                    .unwrap()
+                                    .prog_type
+                                    .as_ref()
+                                    .unwrap_or(&"ip".to_string()),
                                 config.init.as_ref().unwrap().whitelist.as_ref().unwrap(),
                                 start,
                                 end,
@@ -129,6 +179,13 @@ pub fn generate(config: Config, out_file: File) -> Result<(), anyhow::Error> {
                                 continue;
                             }
                             parsed_line = replace_wb_action(
+                                config
+                                    .init
+                                    .as_ref()
+                                    .unwrap()
+                                    .prog_type
+                                    .as_ref()
+                                    .unwrap_or(&"ip".to_string()),
                                 config.init.as_ref().unwrap().blacklist.as_ref().unwrap(),
                                 start,
                                 end,
@@ -216,6 +273,7 @@ fn replace_map(config: &impl List, start: usize, end: usize, line: &str, name: &
 }
 
 fn replace_wb_action(
+    prog_type: &str,
     config: &impl List,
     start: usize,
     end: usize,
@@ -223,7 +281,11 @@ fn replace_wb_action(
     list: &str,
 ) -> String {
     let mut parsed: Vec<String> = Vec::new();
-    let actions: &str = &(GET_DATA.to_owned() + ACTION);
+    let actions: &str = match prog_type.to_lowercase().as_str() {
+        "ip" => &(GET_DATA_IP.to_owned() + ACTION),
+        "dns" => &(GET_DATA_DNS.to_owned() + ACTION),
+        _ => panic!("Generate: Unsupported program type"),
+    };
 
     for l in actions.lines() {
         let mut curr_line = l;
@@ -294,7 +356,7 @@ fn replace_wb_action(
 
 fn replace_g_action(config: &Init, start: usize, end: usize, line: &str, list: &str) -> String {
     let mut parsed: Vec<String> = Vec::new();
-    let actions: &str = &(GET_DATA.to_owned() + GRAYLIST);
+    let actions: &str = &(GET_DATA_IP.to_owned() + GRAYLIST);
 
     for l in actions.lines() {
         let mut curr_line = l;

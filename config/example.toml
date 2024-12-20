@@ -6,10 +6,12 @@ name = "Example"
 hostname = "100.0.0.10"
 # Optional. Defaults to 22
 port = 22
-# Network interface
-iface = "eth0"
 # Username of user (sudoer)
 username = "bobthebuilder" # Username of user (sudoer)
+# Network interface
+iface = "eth0"
+# Type of eBPF program to generate
+type = "ip"
 
 # Not mandatory section
 [init.whitelist]
