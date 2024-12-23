@@ -8,36 +8,43 @@ use crate::{analyze, config::Config, engine::generator, load::load, Analyze, Gen
 
 pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Result<()> {
     let default_path = format!("{}/scripts/run.lua", work_dir);
+    let mut curr_path = std::env::current_dir().expect("Error: Failed to get current directory");
     let mut path = Path::new(&default_path);
 
     if let Some(p) = script_path {
         path = Path::new(p)
     }
 
-    if script_path.is_some() {}
+    if script_path.is_some() {
+        curr_path.push(script_path.unwrap());
+        path = curr_path.as_path();
+        dbg!(&path);
+    }
 
     if path.exists() {
         let lua = Lua::new();
 
-        let analyze_func = lua.create_function(|lua, cfg: mlua::Table| -> mlua::Result<()> {
+        let analyze_func = lua.create_function(|lua, cfg: mlua::Table| -> mlua::Result<bool> {
             let val = cfg.serialize(mlua::serde::Serializer::new(lua))?;
             let json_data = serde_json::to_string(&val).map_err(mlua::Error::external)?;
             let config: Config = serde_json::from_str(&json_data).map_err(mlua::Error::external)?;
             match analyze(Analyze {}, config) {
-                Ok(_) => Ok(()),
+                Ok(ret) => Ok(ret),
                 Err(e) => Err(mlua::Error::runtime(e)),
             }
         })?;
 
-        let generate_func = lua.create_function(|lua, cfg: mlua::Table| -> mlua::Result<()> {
-            let val = cfg.serialize(mlua::serde::Serializer::new(lua))?;
-            let json_data = serde_json::to_string(&val).map_err(mlua::Error::external)?;
-            let config: Config = serde_json::from_str(&json_data).map_err(mlua::Error::external)?;
-            match generator(Generate {}, config) {
-                Ok(_) => Ok(()),
-                Err(e) => Err(mlua::Error::runtime(e)),
-            }
-        })?;
+        let generate_func =
+            lua.create_function(|lua, cfg: mlua::Table| -> mlua::Result<(bool, String)> {
+                let val = cfg.serialize(mlua::serde::Serializer::new(lua))?;
+                let json_data = serde_json::to_string(&val).map_err(mlua::Error::external)?;
+                let config: Config =
+                    serde_json::from_str(&json_data).map_err(mlua::Error::external)?;
+                match generator(Generate {}, config) {
+                    Ok(ret) => Ok(ret),
+                    Err(e) => Err(mlua::Error::runtime(e)),
+                }
+            })?;
 
         let load_func = lua.create_async_function(
             |lua, (cfg, iface, xdp_flags): (mlua::Table, mlua::String, mlua::String)| async move {

@@ -11,7 +11,7 @@ use crate::{
     snippets::{ACTION, BASE_DNS, BASE_IP, GET_DATA_DNS, GET_DATA_IP, GRAYLIST, MAP}, Generate, WORKING_DIR,
 };
 
-pub fn generator(_options: Generate, config: Config) -> Result<(), anyhow::Error> {
+pub fn generator(_options: Generate, config: Config) -> Result<(bool, String), anyhow::Error> {
     let out = format!(
         "{}/out/generated.c",
         WORKING_DIR
@@ -32,7 +32,7 @@ pub fn generator(_options: Generate, config: Config) -> Result<(), anyhow::Error
         .arg("-o")
         .arg("/tmp/generated.o")
         .spawn()?;
-    Ok(())
+    Ok((true, out))
 }
 
 // should have written a library to do most of this stuff... like finding patters and changing
@@ -356,7 +356,14 @@ fn replace_wb_action(
 
 fn replace_g_action(config: &Init, start: usize, end: usize, line: &str, list: &str) -> String {
     let mut parsed: Vec<String> = Vec::new();
-    let actions: &str = &(GET_DATA_IP.to_owned() + GRAYLIST);
+    let action = match config.graylist.as_ref().unwrap().get_action() {
+        "allow" | "deny" => {
+            return replace_wb_action("ip", config.graylist.as_ref().unwrap(), start, end, line, list);
+        },
+        _ => GRAYLIST
+
+    };
+    let actions: &str = &(GET_DATA_IP.to_owned() + action);
 
     for l in actions.lines() {
         let mut curr_line = l;

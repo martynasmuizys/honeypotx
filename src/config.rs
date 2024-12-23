@@ -15,9 +15,7 @@ static DEFAULT_GRAYLIST_ACTION: &str = "investigate";
 #[derive(Debug, Deserialize, Clone)]
 pub struct Config {
     pub init: Option<Init>,
-    pub whitelist: Option<Vec<String>>,
-    pub blacklist: Option<Vec<String>>,
-    pub graylist: Option<Vec<String>>,
+    pub data: Option<Data>
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -31,6 +29,13 @@ pub struct Init {
     pub whitelist: Option<Whitelist>,
     pub blacklist: Option<Blacklist>,
     pub graylist: Option<Graylist>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct Data {
+    pub whitelist: Option<Vec<String>>,
+    pub blacklist: Option<Vec<String>>,
+    pub graylist: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -59,9 +64,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             init: Some(Init::default()),
-            whitelist: None,
-            blacklist: None,
-            graylist: None,
+            data: None
         }
     }
 }

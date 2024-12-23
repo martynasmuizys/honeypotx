@@ -9,6 +9,7 @@ mod objects;
 mod programs;
 mod secret;
 mod snippets;
+mod unload;
 
 use analyze::analyze;
 use anyhow::{anyhow, Context};
@@ -138,6 +139,7 @@ async fn main() -> Result<(), anyhow::Error> {
             "toml" => {
                 user_config_file = fs::read_to_string(config_file)?;
                 config = toml::from_str(&user_config_file)?;
+                dbg!(&config);
             }
             _ => {
                 return Err(anyhow!(
@@ -151,8 +153,12 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     match options.command {
-        Commands::Generate(options) => generator(options, config)?,
-        Commands::Analyze(options) => analyze(options, config)?,
+        Commands::Generate(options) => {
+            generator(options, config)?;
+        },
+        Commands::Analyze(options) => {
+            analyze(options, config)?;
+        }
         Commands::Load(mut options) => load(&mut options, config).await?,
         Commands::SecretDoNotRunThis => secret::secret(),
         Commands::Run(options) => {

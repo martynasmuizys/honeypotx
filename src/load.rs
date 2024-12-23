@@ -115,10 +115,6 @@ async fn load_local_temp(
     config: Config,
     path: &str,
 ) -> Result<(), anyhow::Error> {
-    dbg!(&config);
-    //// increase rlimit? sudo cargo automatically does this?.
-    ////rlimit::increase_nofile_limit(rlimit::INFINITY)?;
-    //clang -O2 -g -target bpf -c src/bpf/xdp.c -o src/bpf/xdp.o
     let mut object_builder = ObjectBuilder::default();
     let object = objects::get_object(&mut object_builder, Path::new(&path))?;
 
@@ -126,10 +122,8 @@ async fn load_local_temp(
     let blacklist = maps::get_map(&object, "blacklist");
     let graylist = maps::get_map(&object, "graylist");
     let programs = programs::get_programs(&object).with_context(|| format!("Program not found"))?;
-    dbg!(&programs);
 
     let name = config.init.as_ref().unwrap().name.as_ref().unwrap();
-    dbg!(&name);
     let program = programs
         .get(name)
         .with_context(|| format!("Program does not exist"))?;
@@ -148,20 +142,41 @@ async fn load_local_temp(
     let mut bl_last_arr_len: usize = 0;
     stdout().execute(EnterAlternateScreen)?;
 
-    //let key = &[127, 0, 0, 1];
-    //let value = &[
-    //    127, 0, 0, 1, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0,
-    //];
-    //map.update(key, value, MapFlags::NO_EXIST)?;
-
     if let Some(wl) = &whitelist {
-        load_map_data_local_temp(wl, &config.whitelist.clone().unwrap_or(Vec::new()))?
+        load_map_data_local_temp(
+            wl,
+            &config
+                .data
+                .as_ref()
+                .unwrap()
+                .whitelist
+                .clone()
+                .unwrap_or(Vec::new()),
+        )?
     }
     if let Some(bl) = &blacklist {
-        load_map_data_local_temp(bl, &config.blacklist.unwrap_or(Vec::new()))?
+        load_map_data_local_temp(
+            bl,
+            &config
+                .data
+                .as_ref()
+                .unwrap()
+                .blacklist
+                .clone()
+                .unwrap_or(Vec::new()),
+        )?
     }
     if let Some(gl) = &graylist {
-        load_map_data_local_temp(gl, &config.graylist.unwrap_or(Vec::new()))?
+        load_map_data_local_temp(
+            gl,
+            &config
+                .data
+                .as_ref()
+                .unwrap()
+                .graylist
+                .clone()
+                .unwrap_or(Vec::new()),
+        )?
     }
 
     while !(*should_terminate.lock().unwrap()) {
@@ -202,6 +217,9 @@ async fn load_local_temp(
             println!(
                 " Total whitelisted IPs  │ {}",
                 &config
+                    .data
+                    .as_ref()
+                    .unwrap()
                     .whitelist
                     .as_ref()
                     .unwrap_or(&Vec::new())
@@ -288,14 +306,14 @@ fn load_local(options: &mut Load, config: Config, path: &str) -> Result<(), anyh
     let mut data: Vec<Maps> = vec![];
     if let Some(maps) = maps.as_array() {
         for m in maps {
-            if "whitelist" == m["name"] && config.whitelist.as_ref().is_some() {
+            if "whitelist" == m["name"] && config.data.as_ref().unwrap().whitelist.as_ref().is_some() {
                 let wid = m["id"]
                     .as_u64()
                     .with_context(|| format!("Map 'whitelist' was not created"))?;
-                load_map_data_local(wid, config.whitelist.as_ref().unwrap())?;
+                load_map_data_local(wid, config.data.as_ref().unwrap().whitelist.as_ref().unwrap())?;
                 data.push(Maps {
                     whitelist: Some(ProgData {
-                        key: config.whitelist.clone().unwrap(),
+                        key: config.data.as_ref().unwrap().whitelist.clone().unwrap(),
                         value: Vec::new(),
                     }),
                     blacklist: None,
@@ -303,31 +321,31 @@ fn load_local(options: &mut Load, config: Config, path: &str) -> Result<(), anyh
                 });
                 continue;
             }
-            if "blacklist" == m["name"] && config.blacklist.as_ref().is_some() {
+            if "blacklist" == m["name"] && config.data.as_ref().unwrap().blacklist.as_ref().is_some() {
                 let bid = m["id"]
                     .as_u64()
                     .with_context(|| format!("Map 'blacklist' was not created"))?;
-                load_map_data_local(bid, config.blacklist.as_ref().unwrap())?;
+                load_map_data_local(bid, config.data.as_ref().unwrap().blacklist.as_ref().unwrap())?;
                 data.push(Maps {
                     whitelist: None,
                     blacklist: Some(ProgData {
-                        key: config.blacklist.clone().unwrap(),
+                        key: config.data.as_ref().unwrap().blacklist.clone().unwrap(),
                         value: Vec::new(),
                     }),
                     graylist: None,
                 });
                 continue;
             }
-            if "graylist" == m["name"] && config.graylist.as_ref().is_some() {
+            if "graylist" == m["name"] && config.data.as_ref().unwrap().graylist.as_ref().is_some() {
                 let gid = m["id"]
                     .as_u64()
                     .with_context(|| format!("Map 'graylist' was not created"))?;
-                load_map_data_local(gid, config.graylist.as_ref().unwrap())?;
+                load_map_data_local(gid, config.data.as_ref().unwrap().graylist.as_ref().unwrap())?;
                 data.push(Maps {
                     whitelist: None,
                     blacklist: None,
                     graylist: Some(ProgData {
-                        key: config.graylist.clone().unwrap(),
+                        key: config.data.as_ref().unwrap().graylist.clone().unwrap(),
                         value: Vec::new(),
                     }),
                 });
@@ -348,20 +366,22 @@ fn load_local(options: &mut Load, config: Config, path: &str) -> Result<(), anyh
         .arg(&options.iface)
         .output()?;
 
-    let p = format!("{}/data",
-                WORKING_DIR
-                    .to_str()
-                    .with_context(|| format!("Failed to parse HOME directory"))?,
+    let p = format!(
+        "{}/data",
+        WORKING_DIR
+            .to_str()
+            .with_context(|| format!("Failed to parse HOME directory"))?,
     );
     let path = Path::new(&p);
     create_dir_all(&path)?;
 
     let mut loaded_progs;
     let progs: Progs;
-    let p = format!("{}/data/progs.json",
-                WORKING_DIR
-                    .to_str()
-                    .with_context(|| format!("Failed to parse HOME directory"))?,
+    let p = format!(
+        "{}/data/progs.json",
+        WORKING_DIR
+            .to_str()
+            .with_context(|| format!("Failed to parse HOME directory"))?,
     );
     let path = Path::new(&p);
 
@@ -377,4 +397,9 @@ fn load_local(options: &mut Load, config: Config, path: &str) -> Result<(), anyh
     loaded_progs.write_all(json_data.as_bytes())?;
 
     Ok(())
+}
+
+
+fn load_remote(options: &mut Load, config: Config, path: &str) -> Result<(), anyhow::Error> {
+    todo!()
 }

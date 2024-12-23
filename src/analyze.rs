@@ -18,7 +18,7 @@ static UBUNTU_PACKAGES: [&str; 4] = [
 ];
 static ARCH_PACKAGES: [&str; 4] = ["bpf", "base", "base-devel", "ripgrep"];
 
-pub fn analyze(_options: Analyze, config: Config) -> Result<(), anyhow::Error> {
+pub fn analyze(_options: Analyze, config: Config) -> Result<bool, anyhow::Error> {
     println!("{}\n", "- CONFIG -".on_blue().black());
     let mut action = String::new();
 
@@ -82,7 +82,7 @@ pub fn analyze(_options: Analyze, config: Config) -> Result<(), anyhow::Error> {
             output.split("\n").collect(),
         )?;
 
-        return Ok(());
+        return Ok(true);
     }
 
     if hostname.is_some() {
@@ -143,7 +143,7 @@ pub fn analyze(_options: Analyze, config: Config) -> Result<(), anyhow::Error> {
         )?;
     }
 
-    Ok(())
+    Ok(true)
 }
 
 fn check_kernel_version(version: &str) -> Result<(), anyhow::Error> {
