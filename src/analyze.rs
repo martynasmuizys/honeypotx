@@ -34,7 +34,6 @@ pub fn analyze(_options: Analyze, config: Config) -> Result<bool, anyhow::Error>
     let action = action.trim().to_lowercase();
 
     if action != "y" && action != "yes" && action != "" {
-        println!("here");
         return Err(anyhow!("Cancelled"));
     }
 
@@ -288,22 +287,16 @@ fn check_packages(nodename: &str) -> Result<(), anyhow::Error> {
         if action != "y" && action != "yes" && action != "" {
             return Err(anyhow!("Cannot proceed with missing packages!"));
         }
-        let password = rpassword::prompt_password("Password: ").unwrap();
+        //let password = rpassword::prompt_password("Password: ").unwrap();
         match nodename {
             "ubuntu" => {
-                Command::new("echo")
-                    .arg(password)
-                    .arg("| sudo")
-                    .arg("-S")
+                Command::new("sudo")
                     .arg("apt install --assume-yes")
                     .arg(missing_pgks.join(" "))
                     .output()?;
             }
             "archlinux" => {
-                Command::new("echo")
-                    .arg(password)
-                    .arg("| sudo")
-                    .arg("-S")
+                Command::new("sudo")
                     .arg("pacman --noconfirm -S")
                     .arg(missing_pgks.join(" "))
                     .output()?;

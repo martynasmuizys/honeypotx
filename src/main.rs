@@ -1,3 +1,5 @@
+#![feature(sync_unsafe_cell)]
+
 mod analyze;
 mod config;
 mod engine;
@@ -14,17 +16,20 @@ mod unload;
 use analyze::analyze;
 use anyhow::{anyhow, Context};
 use clap::{Args, Parser, Subcommand};
-use config::{Config, DEFAULT_NET_IFACE};
+use config::Config;
 use engine::generator;
 use home::home_dir;
 use load::load;
 use lua::run_script;
+use std::cell::SyncUnsafeCell;
 use std::fs;
+use std::sync::Mutex;
 use std::{
     path::{Path, PathBuf},
     process::Command,
     sync::LazyLock,
 };
+use unload::unload;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -52,7 +57,7 @@ struct Generate {}
 #[derive(Args, Debug)]
 pub struct Load {
     /// Interface name.
-    #[arg(short, long, default_value = DEFAULT_NET_IFACE)]
+    #[arg(short, long, default_value = "")]
     iface: String,
     /// XdpFlags to pass to XDP framework. Available options: generic, native, offloaded.
     #[arg(long, default_value = "generic")]
@@ -62,11 +67,14 @@ pub struct Load {
 #[derive(Args, Debug)]
 pub struct Unload {
     /// Interface name.
-    #[arg(short, long, default_value = DEFAULT_NET_IFACE)]
+    #[arg(short, long, default_value = "")]
     iface: String,
     /// XdpFlags to pass to XDP framework. Available options: generic, native, offloaded.
     #[arg(long, default_value = "generic")]
     xdp_flags: String,
+    /// Program ID.
+    #[arg(short, long, default_value = "")]
+    pid: String,
 }
 
 #[derive(Debug, Subcommand)]
@@ -74,8 +82,9 @@ enum Commands {
     /// Generates eBPF program on provided or default config
     Generate(Generate),
     Load(Load),
+    Unload(Unload),
     Analyze(Analyze),
-    SecretDoNotRunThis,
+    Secret,
     Run(Run),
 }
 
@@ -89,6 +98,9 @@ pub static WORKING_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     )
     .into()
 });
+
+// I DONT LIKE THIS BUT IDK OTHER WAY TO DO THIS
+static SSH_PASS: SyncUnsafeCell<Mutex<String>> = SyncUnsafeCell::new(Mutex::new(String::new()));
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -139,7 +151,6 @@ async fn main() -> Result<(), anyhow::Error> {
             "toml" => {
                 user_config_file = fs::read_to_string(config_file)?;
                 config = toml::from_str(&user_config_file)?;
-                dbg!(&config);
             }
             _ => {
                 return Err(anyhow!(
@@ -155,12 +166,15 @@ async fn main() -> Result<(), anyhow::Error> {
     match options.command {
         Commands::Generate(options) => {
             generator(options, config)?;
-        },
+        }
         Commands::Analyze(options) => {
             analyze(options, config)?;
         }
-        Commands::Load(mut options) => load(&mut options, config).await?,
-        Commands::SecretDoNotRunThis => secret::secret(),
+        Commands::Load(mut options) => {
+            load(&mut options, config).await?;
+        }
+        Commands::Unload(mut options) => unload(&mut options, config)?,
+        Commands::Secret => secret::secret(),
         Commands::Run(options) => {
             let result = run_script(
                 WORKING_DIR

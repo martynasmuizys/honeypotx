@@ -397,6 +397,22 @@ fn replace_g_action(config: &Init, start: usize, end: usize, line: &str, list: &
                                 );
                                 l = s.clone();
                             }
+                            "fast_packet_count" => {
+                                s = l.replace(
+                                    &curr_line[start..end + 2],
+                                    &curr_line[start..end + 2].replace(
+                                        &curr_line[start..end + 2],
+                                        &config
+                                            .graylist
+                                            .as_ref()
+                                            .unwrap()
+                                            .fast_packet_count
+                                            .unwrap_or(10)
+                                            .to_string(),
+                                    ),
+                                );
+                                l = s.clone();
+                            }
                             "list" => {
                                 s = l.replace(
                                     &curr_line[start..end + 2],

@@ -7,6 +7,7 @@ pub static BASE_IP: &str = "// clang-format off
 struct Data {
     __u32 ip;
 	__u64 rx_packets;
+  __u64 fast_packets;
     __u64 last_access_ns;
 };
 
@@ -64,6 +65,7 @@ pub static BASE_DNS: &str = "// clang-format off
 struct Data {
   __u32 ip;
   __u64 rx_packets;
+  __u64 fast_packets;
   __u64 last_access_ns;
 };
 
@@ -112,7 +114,8 @@ char __license[] SEC(\"license\") = \"GPL\";
 ";
 
 /// Map template
-pub static MAP: &str = "struct {
+pub static MAP: &str = "#define {{name}}map
+struct {
 	__uint(type, BPF_MAP_TYPE_LRU_HASH);
 	__type(key, __u32);
 	__type(value, struct Data);
@@ -133,15 +136,24 @@ pub static ACTION: &str = "if ({{list}}_data) {
 /// Investigate action (for graylist)
 pub static GRAYLIST: &str = "if ({{list}}_data) {
     __u64 time = (__u64){{frequency}} * MS_IN_NS;
+    #ifdef blacklistmap
     if (bpf_ktime_get_ns() - {{list}}_data->last_access_ns < time) {
+        __sync_fetch_and_add(&{{list}}_data->fast_packets, 1);
+
+        if ({{list}}_data->fast_packets > {{fast_packet_count}}) {
+            struct Data new = {src_ip, {{list}}_data->rx_packets, bpf_ktime_get_ns()};
+            bpf_map_update_elem(&blacklist, &src_ip, &new, BPF_NOEXIST);
+            return XDP_DROP;
+        }
+    } else {
         struct Data new = {src_ip, {{list}}_data->rx_packets, bpf_ktime_get_ns()};
-        bpf_map_update_elem(&blacklist, &src_ip, &new, BPF_NOEXIST);
-        return XDP_DROP;
+        bpf_map_update_elem(&{{list}}, &src_ip, &new, BPF_NOEXIST);
     }
+    #endif
     __sync_fetch_and_add(&{{list}}_data->rx_packets, 1);
     __sync_fetch_and_add(&{{list}}_data->last_access_ns, bpf_ktime_get_ns() - {{list}}_data->last_access_ns);
 } else {
-    struct Data new = {src_ip, 1, bpf_ktime_get_ns()};
+    struct Data new = {src_ip, 1, 0,bpf_ktime_get_ns()};
     bpf_map_update_elem(&{{list}}, &src_ip, &new, BPF_NOEXIST);
 }
 ";

@@ -58,6 +58,7 @@ pub struct Graylist {
     pub max: Option<u32>,
     pub action: Option<String>,
     pub frequency: Option<u32>,
+    pub fast_packet_count: Option<u32>,
 }
 
 impl Default for Config {
@@ -284,6 +285,7 @@ impl Default for Graylist {
             max: Some(DEFAULT_MAX_IPS),
             action: Some(DEFAULT_GRAYLIST_ACTION.to_string()),
             frequency: Some(DEFAULT_FREQUENCY),
+            fast_packet_count: Some(10)
         }
     }
 }

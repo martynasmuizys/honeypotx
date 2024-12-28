@@ -20,7 +20,8 @@
             "enabled": false,
             "max": 32,
             "action": "investigate",
-            "frequency": 1000
+            "frequency": 1000,
+            "fast_packet_count": 10
         }
     },
     "data": {

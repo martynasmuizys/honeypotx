@@ -16,7 +16,9 @@ type = "ip"
 # Not mandatory section
 whitelist = { enabled = false, max = 32, action = "allow"}
 blacklist = { enabled = false, max = 32, action = "deny"}
-graylist = { enabled = false, max = 32, action = "investigate", frequency = 1000 }
+graylist = { enabled = false, max = 32, action = "investigate", frequency = 1000, fast_packet_count = 10 }
+
+# Alternative way to define parameters for lists
 
 # [init.whitelist]
 # # Enable or disable whitelist
@@ -36,6 +38,7 @@ graylist = { enabled = false, max = 32, action = "investigate", frequency = 1000
 # max = 32
 # frequency = 1000 # How fast packets can be sent in ms. (graylist only)
 # action = "investigate"
+# fast_packet_count = 10
 
 # IP/DNS addresses to load data
 [data]

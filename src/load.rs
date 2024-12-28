@@ -1,6 +1,8 @@
 use std::{
-    fs::{create_dir_all, File},
-    io::{self, stdout, Write},
+    fs::{self, create_dir_all, File},
+    io::{self, stdout, Read, Write},
+    net::TcpStream,
+    os::unix::fs::MetadataExt,
     path::Path,
     process::Command,
     sync::{Arc, Mutex},
@@ -17,27 +19,29 @@ use crossterm::{
 use libbpf_rs::{MapCore, MapFlags, ObjectBuilder};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use ssh2::Session;
 use tokio::signal;
 
 use crate::{
-    maps::{self, load_map_data_local, load_map_data_local_temp},
-    objects, programs, Config, Load, WORKING_DIR,
+    config::DEFAULT_NET_IFACE,
+    maps::{self, load_map_data_local, load_map_data_local_temp, load_map_data_remote},
+    objects, programs, Config, Load, SSH_PASS, WORKING_DIR,
 };
 
 #[derive(Debug, Deserialize, Serialize)]
-struct Progs {
+pub struct Progs {
     ids: Vec<usize>,
     progs: Vec<Prog>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-struct Prog {
+pub struct Prog {
     id: usize,
     data: Vec<Maps>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-struct Maps {
+pub struct Maps {
     whitelist: Option<ProgData>,
     blacklist: Option<ProgData>,
     graylist: Option<ProgData>,
@@ -49,9 +53,45 @@ struct ProgData {
     value: Vec<String>,
 }
 
-pub async fn load(options: &mut Load, config: Config) -> Result<(), anyhow::Error> {
+pub async fn load(options: &mut Load, config: Config) -> Result<usize, anyhow::Error> {
     let hostname = config.init.as_ref().unwrap().hostname.as_ref();
+    let port = config.init.as_ref().unwrap().port.as_ref();
     let path = "/tmp/generated.o";
+
+    let config_iface = config.init.as_ref().unwrap().iface.as_ref();
+
+    if config_iface.is_some()
+        && !options.iface.is_empty()
+        && *config_iface.unwrap() != options.iface
+    {
+        let mut action = String::new();
+        print!(
+            "{}: Network interface differs from config. Are you sure you want to proceed? [Y/n] ",
+            "Load".red().bold()
+        );
+        io::stdout().flush()?;
+        io::stdin().read_line(&mut action)?;
+
+        let action = action.trim().to_lowercase();
+
+        if action != "y" && action != "yes" && action != "" {
+            return Err(anyhow!("Cancelled"));
+        }
+    } else if config_iface.is_some() && options.iface.is_empty() {
+        println!(
+            "{}: Using network interface from config: {}...",
+            "Load".red().bold(),
+            config_iface.unwrap().as_str()
+        );
+        options.iface = config_iface.unwrap().to_string();
+    } else if config_iface.is_none() && options.iface.is_empty() {
+        println!(
+            "{}: No network interface provided. Using default: eth0...",
+            "Load".red().bold()
+        );
+        options.iface = String::from(DEFAULT_NET_IFACE);
+    }
+
     if hostname.is_none()
         || *hostname.as_ref().unwrap() == "localhost"
         || *hostname.as_ref().unwrap() == "127.0.0.1"
@@ -63,26 +103,6 @@ pub async fn load(options: &mut Load, config: Config) -> Result<(), anyhow::Erro
                 let _ = sudo::with_env(&["HOME"]);
             }
             sudo::RunningAs::Suid => todo!(),
-        }
-
-        let config_iface = config.init.as_ref().unwrap().iface.as_ref();
-
-        if config_iface.is_some() && *config_iface.unwrap() != options.iface {
-            let mut action = String::new();
-            print!(
-            "{}: Network interface differs from config. Are you sure you want to proceed? [Y/n] ",
-            "Load".red().bold()
-        );
-            io::stdout().flush()?;
-            io::stdin().read_line(&mut action)?;
-
-            let action = action.trim().to_lowercase();
-
-            if action != "y" && action != "yes" && action != "" {
-                return Err(anyhow!("Cancelled"));
-            }
-
-            //options.iface = config_iface.unwrap().to_string();
         }
 
         let mut action = String::new();
@@ -99,15 +119,69 @@ pub async fn load(options: &mut Load, config: Config) -> Result<(), anyhow::Erro
 
         if action == "1" || action == "" {
             load_local_temp(options, config, &path).await?;
-            return Ok(());
+            return Ok(0);
         } else if action == "2" {
-            load_local(options, config, &path)?;
-            return Ok(());
+            return Ok(load_local(options, config, &path)?);
         }
 
         return Err(anyhow!("Cancelled"));
+    } else if hostname.is_some() {
+        let tcp = TcpStream::connect(format!(
+            "{}:{}",
+            hostname.unwrap(),
+            port.unwrap_or(&22).to_string()
+        ))
+        .unwrap();
+        let mut session = Session::new().unwrap();
+        session.set_tcp_stream(tcp);
+        session.handshake().unwrap();
+
+        let mut username: String = String::new();
+        if config.init.as_ref().unwrap().username.is_none() {
+            print!("Username: ");
+            io::stdout().flush()?;
+            io::stdin().read_line(&mut username)?;
+        } else {
+            username = config
+                .init
+                .as_ref()
+                .unwrap()
+                .username
+                .as_ref()
+                .unwrap()
+                .to_string();
+            println!("{}: Using username \"{}\"", "Load".red().bold(), &username);
+        }
+
+        let password: String;
+        unsafe {
+            let pass = (*SSH_PASS.get()).lock().unwrap();
+            if pass.is_empty() {
+                password = (*pass).clone();
+            } else {
+                password = rpassword::prompt_password("Password: ")?;
+            }
+        }
+
+        session.userauth_password(&username.trim(), &password.trim())?;
+
+        unsafe {
+            let pass = (*SSH_PASS.get()).lock().unwrap();
+            if pass.is_empty() {
+                let new = SSH_PASS.get().as_mut().unwrap();
+                *new = Mutex::new(password.clone());
+            }
+        }
+
+        println!(
+            "{}: Connected to {}\n",
+            "Load".red().bold(),
+            hostname.unwrap()
+        );
+        send_file(&config, path, &session, &password)?;
+        load_remote(options, config, &session, &password)?;
     }
-    Ok(())
+    Ok(0)
 }
 
 async fn load_local_temp(
@@ -250,7 +324,7 @@ async fn load_local_temp(
     Ok(())
 }
 
-fn load_local(options: &mut Load, config: Config, path: &str) -> Result<(), anyhow::Error> {
+fn load_local(options: &mut Load, config: Config, path: &str) -> Result<usize, anyhow::Error> {
     let name = config.init.as_ref().unwrap().name.as_ref().unwrap();
     let xdp_flag = match options.xdp_flags.as_ref() {
         "generic" => "xdpgeneric",
@@ -306,11 +380,16 @@ fn load_local(options: &mut Load, config: Config, path: &str) -> Result<(), anyh
     let mut data: Vec<Maps> = vec![];
     if let Some(maps) = maps.as_array() {
         for m in maps {
-            if "whitelist" == m["name"] && config.data.as_ref().unwrap().whitelist.as_ref().is_some() {
+            if "whitelist" == m["name"]
+                && config.data.as_ref().unwrap().whitelist.as_ref().is_some()
+            {
                 let wid = m["id"]
                     .as_u64()
                     .with_context(|| format!("Map 'whitelist' was not created"))?;
-                load_map_data_local(wid, config.data.as_ref().unwrap().whitelist.as_ref().unwrap())?;
+                load_map_data_local(
+                    wid,
+                    config.data.as_ref().unwrap().whitelist.as_ref().unwrap(),
+                )?;
                 data.push(Maps {
                     whitelist: Some(ProgData {
                         key: config.data.as_ref().unwrap().whitelist.clone().unwrap(),
@@ -321,11 +400,16 @@ fn load_local(options: &mut Load, config: Config, path: &str) -> Result<(), anyh
                 });
                 continue;
             }
-            if "blacklist" == m["name"] && config.data.as_ref().unwrap().blacklist.as_ref().is_some() {
+            if "blacklist" == m["name"]
+                && config.data.as_ref().unwrap().blacklist.as_ref().is_some()
+            {
                 let bid = m["id"]
                     .as_u64()
                     .with_context(|| format!("Map 'blacklist' was not created"))?;
-                load_map_data_local(bid, config.data.as_ref().unwrap().blacklist.as_ref().unwrap())?;
+                load_map_data_local(
+                    bid,
+                    config.data.as_ref().unwrap().blacklist.as_ref().unwrap(),
+                )?;
                 data.push(Maps {
                     whitelist: None,
                     blacklist: Some(ProgData {
@@ -336,11 +420,15 @@ fn load_local(options: &mut Load, config: Config, path: &str) -> Result<(), anyh
                 });
                 continue;
             }
-            if "graylist" == m["name"] && config.data.as_ref().unwrap().graylist.as_ref().is_some() {
+            if "graylist" == m["name"] && config.data.as_ref().unwrap().graylist.as_ref().is_some()
+            {
                 let gid = m["id"]
                     .as_u64()
                     .with_context(|| format!("Map 'graylist' was not created"))?;
-                load_map_data_local(gid, config.data.as_ref().unwrap().graylist.as_ref().unwrap())?;
+                load_map_data_local(
+                    gid,
+                    config.data.as_ref().unwrap().graylist.as_ref().unwrap(),
+                )?;
                 data.push(Maps {
                     whitelist: None,
                     blacklist: None,
@@ -373,7 +461,10 @@ fn load_local(options: &mut Load, config: Config, path: &str) -> Result<(), anyh
             .with_context(|| format!("Failed to parse HOME directory"))?,
     );
     let path = Path::new(&p);
-    create_dir_all(&path)?;
+
+    if !path.exists() {
+        create_dir_all(&path)?;
+    }
 
     let mut loaded_progs;
     let progs: Progs;
@@ -396,10 +487,201 @@ fn load_local(options: &mut Load, config: Config, path: &str) -> Result<(), anyh
     let json_data = serde_json::to_string(&progs)?;
     loaded_progs.write_all(json_data.as_bytes())?;
 
-    Ok(())
+    Ok(prog_id as usize)
 }
 
+fn send_file(
+    config: &Config,
+    path: &str,
+    session: &Session,
+    password: &str,
+) -> Result<(), anyhow::Error> {
+    let name = config.init.as_ref().unwrap().name.as_ref().unwrap();
+    let size = File::open(&path)?.metadata()?.size();
+    let file_contents = fs::read(&path)?;
 
-fn load_remote(options: &mut Load, config: Config, path: &str) -> Result<(), anyhow::Error> {
-    todo!()
+    println!("{}: Sending compiled eBPF program...", "Load".red().bold());
+    let mut channel = session
+        .scp_send(Path::new(&path), 0o644, size, None)
+        .unwrap();
+    channel.write(&file_contents)?;
+    channel.send_eof()?;
+    channel.wait_eof()?;
+    channel.close()?;
+    channel.wait_close()?;
+
+    println!("{}: Loading eBPF program...", "Load".red().bold());
+    let mut channel = session.channel_session().unwrap();
+    channel.exec(
+        format!(
+            "echo {} | sudo -S bpftool prog load {} /sys/fs/bpf/{}",
+            password, path, name
+        )
+        .as_str(),
+    )?;
+    Ok(())
+}
+fn load_remote(
+    options: &mut Load,
+    config: Config,
+    session: &Session,
+    password: &str,
+) -> Result<usize, anyhow::Error> {
+    let mut prog_id: u64 = 0;
+    let name = config.init.as_ref().unwrap().name.as_ref().unwrap();
+    let xdp_flag = match options.xdp_flags.as_ref() {
+        "generic" => "xdpgeneric",
+        "native" => "xdpdrv",
+        "offloaded" => "xdpoffload",
+        _ => "xdpgeneric",
+    };
+
+    let mut output = String::new();
+    let mut channel = session.channel_session()?;
+    channel.exec(format!("echo {} | sudo -S bpftool prog show -j", password).as_str())?;
+    channel.read_to_string(&mut output)?;
+    channel.wait_close()?;
+
+    let progs: Value = serde_json::from_str(&output)?;
+    if let Some(progs) = progs.as_array() {
+        for p in progs {
+            if *name == p["name"] {
+                prog_id = p["id"]
+                    .as_u64()
+                    .with_context(|| format!("Program {} was not loaded", &name))?;
+                break;
+            }
+        }
+    } else {
+        return Err(anyhow!("Program {} was not loaded", &name));
+    }
+
+    output.clear();
+
+    channel = session.channel_session()?;
+    channel.exec(format!("echo {} | sudo -S bpftool map show -j", password).as_str())?;
+    channel.read_to_string(&mut output)?;
+    channel.wait_close()?;
+    let maps: Value = serde_json::from_str(&output)?;
+
+    println!("{}: Loading map data...", "Load".red().bold());
+    // Load map data if needed
+    let mut data: Vec<Maps> = vec![];
+    if let Some(maps) = maps.as_array() {
+        for m in maps {
+            if "whitelist" == m["name"]
+                && config.data.as_ref().unwrap().whitelist.as_ref().is_some()
+            {
+                let wid = m["id"]
+                    .as_u64()
+                    .with_context(|| format!("Map 'whitelist' was not created"))?;
+                load_map_data_remote(
+                    wid,
+                    config.data.as_ref().unwrap().whitelist.as_ref().unwrap(),
+                    &session,
+                    password,
+                )?;
+                data.push(Maps {
+                    whitelist: Some(ProgData {
+                        key: config.data.as_ref().unwrap().whitelist.clone().unwrap(),
+                        value: Vec::new(),
+                    }),
+                    blacklist: None,
+                    graylist: None,
+                });
+                continue;
+            }
+            if "blacklist" == m["name"]
+                && config.data.as_ref().unwrap().blacklist.as_ref().is_some()
+            {
+                let bid = m["id"]
+                    .as_u64()
+                    .with_context(|| format!("Map 'blacklist' was not created"))?;
+                load_map_data_remote(
+                    bid,
+                    config.data.as_ref().unwrap().blacklist.as_ref().unwrap(),
+                    &session,
+                    password,
+                )?;
+                data.push(Maps {
+                    whitelist: None,
+                    blacklist: Some(ProgData {
+                        key: config.data.as_ref().unwrap().blacklist.clone().unwrap(),
+                        value: Vec::new(),
+                    }),
+                    graylist: None,
+                });
+                continue;
+            }
+            if "graylist" == m["name"] && config.data.as_ref().unwrap().graylist.as_ref().is_some()
+            {
+                let gid = m["id"]
+                    .as_u64()
+                    .with_context(|| format!("Map 'graylist' was not created"))?;
+                load_map_data_remote(
+                    gid,
+                    config.data.as_ref().unwrap().graylist.as_ref().unwrap(),
+                    &session,
+                    password,
+                )?;
+                data.push(Maps {
+                    whitelist: None,
+                    blacklist: None,
+                    graylist: Some(ProgData {
+                        key: config.data.as_ref().unwrap().graylist.clone().unwrap(),
+                        value: Vec::new(),
+                    }),
+                });
+                continue;
+            }
+        }
+    } else {
+        return Err(anyhow!("Program {} was not loaded", &name));
+    }
+
+    channel = session.channel_session().unwrap();
+    channel.exec(
+        format!(
+            "echo {} | sudo -S bpftool net attach {} id {} dev {}",
+            password, xdp_flag, prog_id, &options.iface
+        )
+        .as_str(),
+    )?;
+    channel.read_to_string(&mut output).unwrap();
+    channel.wait_close()?;
+
+    let p = format!(
+        "{}/data",
+        WORKING_DIR
+            .to_str()
+            .with_context(|| format!("Failed to parse HOME directory"))?,
+    );
+    let path = Path::new(&p);
+
+    if !path.exists() {
+        create_dir_all(&path)?;
+    }
+
+    let mut loaded_progs;
+    let progs: Progs;
+    let p = format!(
+        "{}/data/progs.json",
+        WORKING_DIR
+            .to_str()
+            .with_context(|| format!("Failed to parse HOME directory"))?,
+    );
+    let path = Path::new(&p);
+
+    loaded_progs = File::create(&path)?;
+    progs = Progs {
+        ids: vec![prog_id as usize],
+        progs: vec![Prog {
+            id: prog_id as usize,
+            data: data,
+        }],
+    };
+    let json_data = serde_json::to_string(&progs)?;
+    loaded_progs.write_all(json_data.as_bytes())?;
+
+    Ok(prog_id as usize)
 }
