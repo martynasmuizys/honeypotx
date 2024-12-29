@@ -9,6 +9,6 @@ pub fn get_object(builder: &mut ObjectBuilder, path: &Path) -> Result<Object, an
         .with_context(|| format!("Failed to open object file {:?}", path))?;
     let object = open_object
         .load()
-        .with_context(|| format!("Failed to load BPF program"))?;
+        .with_context(|| "Failed to load BPF program".to_string())?;
     Ok(object)
 }

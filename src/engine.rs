@@ -15,7 +15,7 @@ pub fn generator(_options: Generate, config: Config) -> Result<(bool, String), a
         "{}/out/generated.c",
         WORKING_DIR
             .to_str()
-            .with_context(|| format!("Failed to parse HOME directory"))?
+            .with_context(|| "Failed to parse HOME directory".to_string())?
     );
     let path = Path::new(&out);
     let out_file = File::create(path)?;

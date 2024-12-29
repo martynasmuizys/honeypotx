@@ -5,7 +5,7 @@ use libbpf_rs::{Object, ProgramImpl, Xdp};
 
 use crate::{cli::Load, helpers};
 
-pub fn get_programs<'a>(object: &'a Object) -> Option<HashMap<String, ProgramImpl<'a>>> {
+pub fn get_programs(object: &Object) -> Option<HashMap<String, ProgramImpl<'_>>> {
     let programs = object.progs();
     let mut ret: HashMap<String, ProgramImpl> = HashMap::new();
 
@@ -23,7 +23,7 @@ pub fn attach_xdp<'a>(program: &'a ProgramImpl, options: &Load) -> Result<Xdp<'a
         helpers::iface_to_idx(&options.iface)?,
         helpers::get_xdp_flags(&options.xdp_flags)?,
     )
-    .with_context(|| format!("Failed to attach BPF program to XDP"))?;
+    .with_context(|| "Failed to attach BPF program to XDP".to_string())?;
     Ok(xdp)
 }
 
@@ -32,6 +32,6 @@ pub fn detach_xdp(xdp: &Xdp, options: &Load) -> Result<(), anyhow::Error> {
         helpers::iface_to_idx(&options.iface)?,
         helpers::get_xdp_flags(&options.xdp_flags)?,
     )
-    .with_context(|| format!("Failed to detach BPF program from XDP"))?;
+    .with_context(|| "Failed to detach BPF program from XDP".to_string())?;
     Ok(())
 }

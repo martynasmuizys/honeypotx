@@ -33,7 +33,7 @@ pub fn analyze(_options: Analyze, config: Config) -> Result<bool, anyhow::Error>
 
     let action = action.trim().to_lowercase();
 
-    if action != "y" && action != "yes" && action != "" {
+    if action != "y" && action != "yes" && !action.is_empty() {
         return Err(anyhow!("Cancelled"));
     }
 
@@ -56,12 +56,12 @@ pub fn analyze(_options: Analyze, config: Config) -> Result<bool, anyhow::Error>
 
         println!("{}", "- Required Packages Check -".on_blue().black());
         output = String::from_utf8(Command::new("uname").arg("-n").output().unwrap().stdout)?;
-        check_packages(&output.trim())?;
+        check_packages(output.trim())?;
 
         println!("{}", "- Kernel Flags Check -".on_blue().black());
         output = String::from_utf8(
             Command::new("sh")
-                .args(&["-c", "sudo bpftool feature | rg -w 'CONFIG_BPF|CONFIG_BPF_SYSCALL|CONFIG_BPF_JIT|CONFIG_BPF_EVENTS'"])
+                .args(["-c", "sudo bpftool feature | rg -w 'CONFIG_BPF|CONFIG_BPF_SYSCALL|CONFIG_BPF_JIT|CONFIG_BPF_EVENTS'"])
                 .output()
                 .unwrap()
                 .stdout,
@@ -71,7 +71,7 @@ pub fn analyze(_options: Analyze, config: Config) -> Result<bool, anyhow::Error>
         println!("{}", "- Network Interface Check -".on_blue().black());
         output = String::from_utf8(
             Command::new("sh")
-                .args(&["-c", "ip -o link show | awk -F': ' '{{print $2}}'"])
+                .args(["-c", "ip -o link show | awk -F': ' '{{print $2}}'"])
                 .output()
                 .unwrap()
                 .stdout,
@@ -88,7 +88,7 @@ pub fn analyze(_options: Analyze, config: Config) -> Result<bool, anyhow::Error>
         let tcp = TcpStream::connect(format!(
             "{}:{}",
             hostname.unwrap(),
-            port.unwrap_or(&22).to_string()
+            port.unwrap_or(&22)
         ))
         .unwrap();
         let mut session = Session::new().unwrap();
@@ -118,7 +118,7 @@ pub fn analyze(_options: Analyze, config: Config) -> Result<bool, anyhow::Error>
 
         let password = rpassword::prompt_password("Password: ").unwrap();
         session
-            .userauth_password(&username.trim(), &password.trim())
+            .userauth_password(username.trim(), password.trim())
             .unwrap();
         println!(
             "{}: Connected to {}\n",
@@ -243,7 +243,7 @@ fn check_packages(nodename: &str) -> Result<(), anyhow::Error> {
         "archlinux" => {
             output = String::from_utf8(
                 Command::new("sh")
-                    .args(&[
+                    .args([
                         "-c",
                         format!("pacman -Qqen | grep -wE '{}'", ARCH_PACKAGES.join("|")).as_str(),
                     ])
@@ -253,7 +253,7 @@ fn check_packages(nodename: &str) -> Result<(), anyhow::Error> {
             )?;
 
             for pkg in ARCH_PACKAGES {
-                if !output.contains(&pkg) {
+                if !output.contains(pkg) {
                     missing_pgks.push(pkg);
                 } else {
                     println!(
@@ -267,7 +267,7 @@ fn check_packages(nodename: &str) -> Result<(), anyhow::Error> {
         _ => return Err(anyhow!("Unsupported OS: {}", output)),
     }
 
-    if missing_pgks.len() > 0 {
+    if !missing_pgks.is_empty() {
         let mut action = String::new();
         println!(
             "{}: Missing packages:\n - {}",
@@ -283,7 +283,7 @@ fn check_packages(nodename: &str) -> Result<(), anyhow::Error> {
 
         let action = action.trim().to_lowercase();
 
-        if action != "y" && action != "yes" && action != "" {
+        if action != "y" && action != "yes" && !action.is_empty() {
             return Err(anyhow!("Cannot proceed with missing packages!"));
         }
         //let password = rpassword::prompt_password("Password: ").unwrap();
@@ -367,7 +367,7 @@ fn check_packages_remote(session: &mut Session, password: &str) -> Result<(), an
         _ => return Err(anyhow!("Unsupported OS: {}", output)),
     }
 
-    if missing_pgks.len() > 0 {
+    if !missing_pgks.is_empty() {
         let mut action = String::new();
         println!(
             "{}: Missing packages:\n - {}",
@@ -383,7 +383,7 @@ fn check_packages_remote(session: &mut Session, password: &str) -> Result<(), an
 
         let action = action.trim().to_lowercase();
 
-        if action != "y" && action != "yes" && action != "" {
+        if action != "y" && action != "yes" && !action.is_empty() {
             return Err(anyhow!("Cannot proceed with missing packages!"));
         }
         match nodename.as_str() {
@@ -443,7 +443,7 @@ fn check_bpf_enabled(flags: Vec<&str>) -> Result<(), anyhow::Error> {
         }
     }
 
-    if missing_flags.len() != 0 {
+    if !missing_flags.is_empty() {
         return Err(anyhow!(
             "Missing kernel flags:\n - {}",
             missing_flags.join("\n - ")
@@ -512,7 +512,7 @@ fn check_net_iface_remote(session: &mut Session, iface: &str) -> Result<(), anyh
     println!("{}: Checking network interfaces", "Analyze".blue().bold());
     let mut channel = session.channel_session().unwrap();
     channel
-        .exec(format!("ip -o link show | awk -F': ' '{{print $2}}'",).as_str())
+        .exec("ip -o link show | awk -F': ' '{print $2}'".to_string().as_str())
         .unwrap();
     let mut output = String::new();
     channel.read_to_string(&mut output).unwrap();

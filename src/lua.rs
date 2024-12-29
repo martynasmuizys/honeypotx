@@ -100,7 +100,7 @@ pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Resu
             let xdp_flags: mlua::String = opts.get("xdp_flags")?;
             let prog_id: mlua::Integer = opts.get("prog_id")?;
 
-            let val = cfg.serialize(mlua::serde::Serializer::new(&lua))?;
+            let val = cfg.serialize(mlua::serde::Serializer::new(lua))?;
             let json_data = serde_json::to_string(&val).map_err(mlua::Error::external)?;
             let config: Config = serde_json::from_str(&json_data).map_err(mlua::Error::external)?;
 
@@ -125,7 +125,7 @@ pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Resu
             let cfg: mlua::Table = opts.get("config")?;
             let map_name: mlua::String = opts.get("iface")?;
 
-            let val = cfg.serialize(mlua::serde::Serializer::new(&lua))?;
+            let val = cfg.serialize(mlua::serde::Serializer::new(lua))?;
             let json_data = serde_json::to_string(&val).map_err(mlua::Error::external)?;
             let config: Config = serde_json::from_str(&json_data).map_err(mlua::Error::external)?;
 

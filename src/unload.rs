@@ -31,7 +31,7 @@ pub fn unload(options: &mut Unload, config: Config) -> Result<(), anyhow::Error>
 
         let action = action.trim().to_lowercase();
 
-        if action != "y" && action != "yes" && action != "" {
+        if action != "y" && action != "yes" && !action.is_empty() {
             return Err(anyhow!("Cancelled"));
         }
     } else if config_iface.is_some() && options.iface.is_empty() {
@@ -67,7 +67,7 @@ pub fn unload(options: &mut Unload, config: Config) -> Result<(), anyhow::Error>
         let tcp = TcpStream::connect(format!(
             "{}:{}",
             hostname.unwrap(),
-            port.unwrap_or(&22).to_string()
+            port.unwrap_or(&22)
         ))
         .unwrap();
         let mut session = Session::new().unwrap();

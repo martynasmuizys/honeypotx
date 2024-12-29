@@ -21,7 +21,7 @@ pub fn get_map<'a>(object: &'a Object, name: &'a str) -> Option<MapImpl<'a>> {
 }
 
 pub fn load_map_data_local_temp(map: &MapImpl, data: &Vec<String>) -> Result<(), anyhow::Error> {
-    if data.len() == 0 {
+    if data.is_empty() {
         return Ok(());
     }
 
@@ -143,7 +143,7 @@ pub fn get_map_data(config: &Config, map_name: &str) -> Result<String, anyhow::E
         let tcp = TcpStream::connect(format!(
             "{}:{}",
             hostname.unwrap(),
-            port.unwrap_or(&22).to_string()
+            port.unwrap_or(&22)
         ))
         .unwrap();
         let mut session = Session::new().unwrap();
@@ -177,7 +177,7 @@ pub fn get_map_data(config: &Config, map_name: &str) -> Result<String, anyhow::E
             }
         }
 
-        session.userauth_password(&username.trim(), &password.trim())?;
+        session.userauth_password(username.trim(), password.trim())?;
 
         unsafe {
             let pass = (*SSH_PASS.get()).lock().unwrap();
@@ -188,7 +188,7 @@ pub fn get_map_data(config: &Config, map_name: &str) -> Result<String, anyhow::E
         }
 
         session
-            .userauth_password(&username.trim(), &password.trim())
+            .userauth_password(username.trim(), password.trim())
             .unwrap();
         println!(
             "{}: Connected to {}\n",

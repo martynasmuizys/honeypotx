@@ -72,7 +72,7 @@ pub async fn load(options: &mut Load, config: Config) -> Result<usize, anyhow::E
 
         let action = action.trim().to_lowercase();
 
-        if action != "y" && action != "yes" && action != "" {
+        if action != "y" && action != "yes" && !action.is_empty() {
             return Err(anyhow!("Cancelled"));
         }
     } else if config_iface.is_some() && options.iface.is_empty() {
@@ -115,11 +115,11 @@ pub async fn load(options: &mut Load, config: Config) -> Result<usize, anyhow::E
 
         let action = action.trim().to_lowercase();
 
-        if action == "1" || action == "" {
-            load_local_temp(options, config, &path).await?;
+        if action == "1" || action.is_empty() {
+            load_local_temp(options, config, path).await?;
             return Ok(0);
         } else if action == "2" {
-            return load_local(options, config, &path);
+            return load_local(options, config, path);
         }
 
         return Err(anyhow!("Cancelled"));
@@ -127,7 +127,7 @@ pub async fn load(options: &mut Load, config: Config) -> Result<usize, anyhow::E
         let tcp = TcpStream::connect(format!(
             "{}:{}",
             hostname.unwrap(),
-            port.unwrap_or(&22).to_string()
+            port.unwrap_or(&22)
         ))
         .unwrap();
         let mut session = Session::new().unwrap();
@@ -161,7 +161,7 @@ pub async fn load(options: &mut Load, config: Config) -> Result<usize, anyhow::E
             }
         }
 
-        session.userauth_password(&username.trim(), &password.trim())?;
+        session.userauth_password(username.trim(), password.trim())?;
 
         unsafe {
             let pass = (*SSH_PASS.get()).lock().unwrap();
@@ -193,13 +193,13 @@ async fn load_local_temp(
     let whitelist = maps::get_map(&object, "whitelist");
     let blacklist = maps::get_map(&object, "blacklist");
     let graylist = maps::get_map(&object, "graylist");
-    let programs = programs::get_programs(&object).with_context(|| format!("Program not found"))?;
+    let programs = programs::get_programs(&object).with_context(|| "Program not found".to_string())?;
 
     let name = config.init.as_ref().unwrap().name.as_ref().unwrap();
     let program = programs
         .get(name)
-        .with_context(|| format!("Program does not exist"))?;
-    let xdp = programs::attach_xdp(&program, &options)?;
+        .with_context(|| "Program does not exist".to_string())?;
+    let xdp = programs::attach_xdp(program, options)?;
 
     let should_terminate = Arc::new(Mutex::new(false));
     let signal_handle = should_terminate.clone();
@@ -223,7 +223,7 @@ async fn load_local_temp(
                 .unwrap()
                 .whitelist
                 .clone()
-                .unwrap_or(Vec::new()),
+                .unwrap_or_default(),
         )?
     }
     if let Some(bl) = &blacklist {
@@ -235,7 +235,7 @@ async fn load_local_temp(
                 .unwrap()
                 .blacklist
                 .clone()
-                .unwrap_or(Vec::new()),
+                .unwrap_or_default(),
         )?
     }
     if let Some(gl) = &graylist {
@@ -247,7 +247,7 @@ async fn load_local_temp(
                 .unwrap()
                 .graylist
                 .clone()
-                .unwrap_or(Vec::new()),
+                .unwrap_or_default(),
         )?
     }
 
@@ -259,12 +259,12 @@ async fn load_local_temp(
                 let _rx_packets: u64 = 0;
                 let _last_access_time: u64 = 0;
                 let data = bl.lookup(&k, MapFlags::ANY)?.unwrap();
-                for (i, b) in data[0..4].into_iter().enumerate() {
+                for (i, b) in data[0..4].iter().enumerate() {
                     if i > 0 {
                         ip.push_str(format!(".{}", &b.to_string()).as_str());
                         continue;
                     }
-                    ip.push_str(format!("{}", &b.to_string()).as_str());
+                    ip.push_str((b.to_string()).to_string().as_str());
                 }
 
                 if !bl_ip_arr.contains(&ip) {
@@ -273,7 +273,7 @@ async fn load_local_temp(
             }
         }
 
-        let last_blaclisted_ip: &str = if bl_ip_arr.len() != 0 {
+        let last_blaclisted_ip: &str = if !bl_ip_arr.is_empty() {
             bl_ip_arr.last().unwrap()
         } else {
             "No blacklisted IPs."
@@ -318,7 +318,7 @@ async fn load_local_temp(
     }
 
     stdout().execute(LeaveAlternateScreen)?;
-    programs::detach_xdp(&xdp, &options)?;
+    programs::detach_xdp(&xdp, options)?;
     Ok(())
 }
 
@@ -383,7 +383,7 @@ fn load_local(options: &mut Load, config: Config, path: &str) -> Result<usize, a
             {
                 let wid = m["id"]
                     .as_u64()
-                    .with_context(|| format!("Map 'whitelist' was not created"))?;
+                    .with_context(|| "Map 'whitelist' was not created".to_string())?;
                 load_map_data_local(
                     wid,
                     config.data.as_ref().unwrap().whitelist.as_ref().unwrap(),
@@ -403,7 +403,7 @@ fn load_local(options: &mut Load, config: Config, path: &str) -> Result<usize, a
             {
                 let bid = m["id"]
                     .as_u64()
-                    .with_context(|| format!("Map 'blacklist' was not created"))?;
+                    .with_context(|| "Map 'blacklist' was not created".to_string())?;
                 load_map_data_local(
                     bid,
                     config.data.as_ref().unwrap().blacklist.as_ref().unwrap(),
@@ -422,7 +422,7 @@ fn load_local(options: &mut Load, config: Config, path: &str) -> Result<usize, a
             {
                 let gid = m["id"]
                     .as_u64()
-                    .with_context(|| format!("Map 'graylist' was not created"))?;
+                    .with_context(|| "Map 'graylist' was not created".to_string())?;
                 load_map_data_local(
                     gid,
                     config.data.as_ref().unwrap().graylist.as_ref().unwrap(),
@@ -456,30 +456,30 @@ fn load_local(options: &mut Load, config: Config, path: &str) -> Result<usize, a
         "{}/data",
         WORKING_DIR
             .to_str()
-            .with_context(|| format!("Failed to parse HOME directory"))?,
+            .with_context(|| "Failed to parse HOME directory".to_string())?,
     );
     let path = Path::new(&p);
 
     if !path.exists() {
-        create_dir_all(&path)?;
+        create_dir_all(path)?;
     }
 
     let mut loaded_progs;
-    let progs: Progs;
+
     let p = format!(
         "{}/data/progs.json",
         WORKING_DIR
             .to_str()
-            .with_context(|| format!("Failed to parse HOME directory"))?,
+            .with_context(|| "Failed to parse HOME directory".to_string())?,
     );
     let path = Path::new(&p);
 
-    loaded_progs = File::create(&path)?;
-    progs = Progs {
+    loaded_progs = File::create(path)?;
+    let progs: Progs = Progs {
         ids: vec![prog_id as usize],
         progs: vec![Prog {
             id: prog_id as usize,
-            data: data,
+            data,
         }],
     };
     let json_data = serde_json::to_string(&progs)?;
@@ -495,8 +495,8 @@ fn send_file(
     password: &str,
 ) -> Result<(), anyhow::Error> {
     let name = config.init.as_ref().unwrap().name.as_ref().unwrap();
-    let size = File::open(&path)?.metadata()?.size();
-    let file_contents = fs::read(&path)?;
+    let size = File::open(path)?.metadata()?.size();
+    let file_contents = fs::read(path)?;
 
     println!("{}: Sending compiled eBPF program...", "Load".red().bold());
     let mut channel = session
@@ -572,11 +572,11 @@ fn load_remote(
             {
                 let wid = m["id"]
                     .as_u64()
-                    .with_context(|| format!("Map 'whitelist' was not created"))?;
+                    .with_context(|| "Map 'whitelist' was not created".to_string())?;
                 load_map_data_remote(
                     wid,
                     config.data.as_ref().unwrap().whitelist.as_ref().unwrap(),
-                    &session,
+                    session,
                     password,
                 )?;
                 data.push(Maps {
@@ -594,11 +594,11 @@ fn load_remote(
             {
                 let bid = m["id"]
                     .as_u64()
-                    .with_context(|| format!("Map 'blacklist' was not created"))?;
+                    .with_context(|| "Map 'blacklist' was not created".to_string())?;
                 load_map_data_remote(
                     bid,
                     config.data.as_ref().unwrap().blacklist.as_ref().unwrap(),
-                    &session,
+                    session,
                     password,
                 )?;
                 data.push(Maps {
@@ -615,11 +615,11 @@ fn load_remote(
             {
                 let gid = m["id"]
                     .as_u64()
-                    .with_context(|| format!("Map 'graylist' was not created"))?;
+                    .with_context(|| "Map 'graylist' was not created".to_string())?;
                 load_map_data_remote(
                     gid,
                     config.data.as_ref().unwrap().graylist.as_ref().unwrap(),
-                    &session,
+                    session,
                     password,
                 )?;
                 data.push(Maps {
@@ -652,30 +652,30 @@ fn load_remote(
         "{}/data",
         WORKING_DIR
             .to_str()
-            .with_context(|| format!("Failed to parse HOME directory"))?,
+            .with_context(|| "Failed to parse HOME directory".to_string())?,
     );
     let path = Path::new(&p);
 
     if !path.exists() {
-        create_dir_all(&path)?;
+        create_dir_all(path)?;
     }
 
     let mut loaded_progs;
-    let progs: Progs;
+
     let p = format!(
         "{}/data/progs.json",
         WORKING_DIR
             .to_str()
-            .with_context(|| format!("Failed to parse HOME directory"))?,
+            .with_context(|| "Failed to parse HOME directory".to_string())?,
     );
     let path = Path::new(&p);
 
-    loaded_progs = File::create(&path)?;
-    progs = Progs {
+    loaded_progs = File::create(path)?;
+    let progs: Progs = Progs {
         ids: vec![prog_id as usize],
         progs: vec![Prog {
             id: prog_id as usize,
-            data: data,
+            data,
         }],
     };
     let json_data = serde_json::to_string(&progs)?;

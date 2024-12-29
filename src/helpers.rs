@@ -10,13 +10,13 @@ pub fn iface_to_idx(iface: &str) -> Result<i32, anyhow::Error> {
             return Ok(i.index as i32);
         }
     }
-    return Err(anyhow!("Interface not found"));
+    Err(anyhow!("Interface not found"))
 }
 
 /// Turns XDP flag into corresponding type.
 pub fn get_xdp_flags(flags: &str) -> Result<XdpFlags, anyhow::Error> {
     match flags {
-        "generic" => return Ok(XdpFlags::SKB_MODE),
-        _ => return Err(anyhow!("Flag not found!")),
+        "generic" => Ok(XdpFlags::SKB_MODE),
+        _ => Err(anyhow!("Flag not found!")),
     }
 }

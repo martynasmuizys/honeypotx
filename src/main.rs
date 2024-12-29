@@ -131,7 +131,7 @@ async fn main() -> Result<(), anyhow::Error> {
             let result = run_script(
                 WORKING_DIR
                     .to_str()
-                    .with_context(|| format!("Failed to parse HOME directory"))?,
+                    .with_context(|| "Failed to parse HOME directory".to_string())?,
                 options.path.as_deref(),
             )
             .await;
