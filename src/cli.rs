@@ -7,7 +7,7 @@ pub struct Options {
     #[command(subcommand)]
     pub command: Commands,
     /// Config file name [TOML/JSON].
-    #[arg(short, long, default_value = "")]
+    #[arg(short, long, global = true, default_value = "")]
     pub config: String,
 }
 
@@ -16,12 +16,18 @@ pub struct Options {
 pub enum Commands {
     /// Generates eBPF program on provided or default config
     Generate(Generate),
+    /// Loads eBPF program on a network interface
     Load(Load),
+    /// Unloads eBPF program
     Unload(Unload),
+    /// Analyzes OS compatibility with eBPF
     Analyze(Analyze),
+    /// Get some data
     #[command(subcommand)]
     Get(Get),
+    /// SECRET!!! DO NOT RUN THIS!!! VERY DANGEROUS!!!
     Secret,
+    /// Embed and run Lua script
     Run(Run),
 }
 

@@ -6,7 +6,13 @@ use serde::Serialize;
 use serde_json::Value as JsonValue;
 
 use crate::{
-    analyze, cli::{Analyze, Generate, Load, Unload}, config::Config, engine::generator, load::load, maps::get_map_data, unload::unload
+    analyze,
+    cli::{Analyze, Generate, Load, Unload},
+    config::Config,
+    engine::generator,
+    load::load,
+    maps::get_map_data,
+    unload::unload,
 };
 
 pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Result<()> {
@@ -26,7 +32,8 @@ pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Resu
     if path.exists() {
         let lua = Lua::new();
 
-        let analyze_func = lua.create_function(|lua, cfg: mlua::Table| -> mlua::Result<bool> {
+        let analyze_func = lua.create_function(|lua, opts: mlua::Table| -> mlua::Result<bool> {
+            let cfg: mlua::Table = opts.get("config")?;
             if std::env::var("HPX_ANALYZED").unwrap_or("0".to_string()) == "1" {
                 return Ok(true);
             }
@@ -43,7 +50,8 @@ pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Resu
         })?;
 
         let generate_func =
-            lua.create_function(|lua, cfg: mlua::Table| -> mlua::Result<(bool, String)> {
+            lua.create_function(|lua, opts: mlua::Table| -> mlua::Result<(bool, String)> {
+                let cfg: mlua::Table = opts.get("config")?;
                 if std::env::var("HPX_GENERATED").unwrap_or("0".to_string()) == "1" {
                     return Ok((false, "".to_string()));
                 }
@@ -60,80 +68,78 @@ pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Resu
                 }
             })?;
 
-        let load_func = lua.create_async_function(
-            |lua, (cfg, iface, xdp_flags): (mlua::Table, mlua::String, mlua::String)| async move {
-                let val = cfg.serialize(mlua::serde::Serializer::new(&lua))?;
-                let json_data = serde_json::to_string(&val).map_err(mlua::Error::external)?;
-                let config: Config =
-                    serde_json::from_str(&json_data).map_err(mlua::Error::external)?;
+        let load_func = lua.create_async_function(|lua, opts: mlua::Table| async move {
+            let cfg: mlua::Table = opts.get("config")?;
+            let iface: mlua::String = opts.get("iface")?;
+            let xdp_flags: mlua::String = opts.get("xdp_flags")?;
 
-                check_sudo();
+            let val = cfg.serialize(mlua::serde::Serializer::new(&lua))?;
+            let json_data = serde_json::to_string(&val).map_err(mlua::Error::external)?;
+            let config: Config = serde_json::from_str(&json_data).map_err(mlua::Error::external)?;
 
-                match load(
-                    &mut Load {
-                        iface: iface.to_string_lossy(),
-                        xdp_flags: xdp_flags.to_string_lossy(),
-                    },
-                    config,
-                )
-                .await
-                .into_lua_err()
-                {
-                    Ok(ret) => Ok(ret),
-                    Err(e) => Err(mlua::Error::runtime(e)),
+            check_sudo();
+
+            match load(
+                &mut Load {
+                    iface: iface.to_string_lossy(),
+                    xdp_flags: xdp_flags.to_string_lossy(),
+                },
+                config,
+            )
+            .await
+            .into_lua_err()
+            {
+                Ok(ret) => Ok(ret),
+                Err(e) => Err(mlua::Error::runtime(e)),
+            }
+        })?;
+
+        let unload_func = lua.create_function(|lua, opts: mlua::Table| {
+            let cfg: mlua::Table = opts.get("config")?;
+            let iface: mlua::String = opts.get("iface")?;
+            let xdp_flags: mlua::String = opts.get("xdp_flags")?;
+            let prog_id: mlua::Integer = opts.get("prog_id")?;
+
+            let val = cfg.serialize(mlua::serde::Serializer::new(&lua))?;
+            let json_data = serde_json::to_string(&val).map_err(mlua::Error::external)?;
+            let config: Config = serde_json::from_str(&json_data).map_err(mlua::Error::external)?;
+
+            check_sudo();
+
+            match unload(
+                &mut Unload {
+                    iface: iface.to_string_lossy(),
+                    xdp_flags: xdp_flags.to_string_lossy(),
+                    pid: prog_id.to_string(),
+                },
+                config,
+            )
+            .into_lua_err()
+            {
+                Ok(ret) => Ok(ret),
+                Err(e) => Err(mlua::Error::runtime(e)),
+            }
+        })?;
+
+        let get_map_data_func = lua.create_function(|lua, opts: mlua::Table| {
+            let cfg: mlua::Table = opts.get("config")?;
+            let map_name: mlua::String = opts.get("iface")?;
+
+            let val = cfg.serialize(mlua::serde::Serializer::new(&lua))?;
+            let json_data = serde_json::to_string(&val).map_err(mlua::Error::external)?;
+            let config: Config = serde_json::from_str(&json_data).map_err(mlua::Error::external)?;
+
+            check_sudo();
+
+            match get_map_data(&config, &map_name.to_string_lossy()) {
+                Ok(ret) => {
+                    let json: JsonValue =
+                        serde_json::from_str(&ret).map_err(mlua::Error::external)?;
+                    Ok(lua.to_value(&json)?)
                 }
-            },
-        )?;
-
-        let unload_func = lua.create_function(
-            |lua,
-             (cfg, iface, xdp_flags, prog_id): (
-                mlua::Table,
-                mlua::String,
-                mlua::String,
-                mlua::Integer,
-            )| {
-                let val = cfg.serialize(mlua::serde::Serializer::new(&lua))?;
-                let json_data = serde_json::to_string(&val).map_err(mlua::Error::external)?;
-                let config: Config =
-                    serde_json::from_str(&json_data).map_err(mlua::Error::external)?;
-
-                check_sudo();
-
-                match unload(
-                    &mut Unload {
-                        iface: iface.to_string_lossy(),
-                        xdp_flags: xdp_flags.to_string_lossy(),
-                        pid: prog_id.to_string(),
-                    },
-                    config,
-                )
-                .into_lua_err()
-                {
-                    Ok(ret) => Ok(ret),
-                    Err(e) => Err(mlua::Error::runtime(e)),
-                }
-            },
-        )?;
-
-        let get_map_data_func =
-            lua.create_function(|lua, (cfg, map_name): (mlua::Table, mlua::String)| {
-                let val = cfg.serialize(mlua::serde::Serializer::new(&lua))?;
-                let json_data = serde_json::to_string(&val).map_err(mlua::Error::external)?;
-                let config: Config =
-                    serde_json::from_str(&json_data).map_err(mlua::Error::external)?;
-
-                check_sudo();
-
-                match get_map_data(&config, &map_name.to_string_lossy()) {
-                    Ok(ret) => {
-                        let json: JsonValue =
-                            serde_json::from_str(&ret).map_err(mlua::Error::external)?;
-                        Ok(lua.to_value(&json)?)
-                    }
-                    Err(e) => Err(mlua::Error::runtime(e)),
-                }
-            })?;
+                Err(e) => Err(mlua::Error::runtime(e)),
+            }
+        })?;
 
         lua.globals().set("analyze", analyze_func)?;
         lua.globals().set("generate", generate_func)?;
