@@ -14,15 +14,10 @@ use ssh2::Session;
 use crate::{config::Config, SSH_PASS};
 
 pub fn get_map<'a>(object: &'a Object, name: &'a str) -> Option<MapImpl<'a>> {
-    let maps = object.maps();
+    let mut maps = object.maps();
 
-    for m in maps {
-        if m.name() == name {
-            return Some(m);
-        }
-    }
+    maps.find(|m| m.name() == name)
 
-    None
 }
 
 pub fn load_map_data_local_temp(map: &MapImpl, data: &Vec<String>) -> Result<(), anyhow::Error> {

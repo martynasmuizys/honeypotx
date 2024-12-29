@@ -101,7 +101,7 @@ pub fn unload(options: &mut Unload, config: Config) -> Result<(), anyhow::Error>
             }
         }
 
-        session.userauth_password(&username.trim(), &password.trim())?;
+        session.userauth_password(username.trim(), password.trim())?;
 
         unsafe {
             let pass = (*SSH_PASS.get()).lock().unwrap();
@@ -112,7 +112,7 @@ pub fn unload(options: &mut Unload, config: Config) -> Result<(), anyhow::Error>
         }
 
         session
-            .userauth_password(&username.trim(), &password.trim())
+            .userauth_password(username.trim(), password.trim())
             .unwrap();
         println!(
             "{}: Connected to {}\n",
@@ -150,7 +150,7 @@ fn unload_local(options: &mut Unload, config: Config) -> Result<(), anyhow::Erro
         "{}/data",
         WORKING_DIR
             .to_str()
-            .with_context(|| format!("Failed to parse HOME directory"))?,
+            .with_context(|| "Failed to parse HOME directory")?,
     );
     let path = Path::new(&p);
 
@@ -163,11 +163,11 @@ fn unload_local(options: &mut Unload, config: Config) -> Result<(), anyhow::Erro
         "{}/data/progs.json",
         WORKING_DIR
             .to_str()
-            .with_context(|| format!("Failed to parse HOME directory"))?,
+            .with_context(|| "Failed to parse HOME directory")?,
     );
     let path = Path::new(&p);
 
-    loaded_progs = File::create(&path)?;
+    loaded_progs = File::create(path)?;
     let json_data = serde_json::to_string("{}")?;
     loaded_progs.write_all(json_data.as_bytes())?;
 

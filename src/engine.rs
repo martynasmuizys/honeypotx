@@ -11,7 +11,6 @@ use crate::{
 };
 
 pub fn generator(_options: Generate, config: Config) -> Result<(bool, String), anyhow::Error> {
-    dbg!(sudo::check());
     let out = format!(
         "{}/out/generated.c",
         WORKING_DIR
@@ -64,11 +63,8 @@ fn generate_program(config: Config, out: File, prog_base: &str) -> Result<(), an
             Some(start) => match line.find("}}") {
                 Some(end) => {
                     let block = &line[start + 2..end];
-                    let parsed_line: String;
-                    match block {
-                        "name" => {
-                            parsed_line = replace_name(&config, start, end, line);
-                        }
+                    let parsed_line: String = match block {
+                        "name" => replace_name(&config, start, end, line),
                         "whitelist_map" => {
                             if config.init.as_ref().unwrap().whitelist.is_none()
                                 || !config
@@ -83,13 +79,13 @@ fn generate_program(config: Config, out: File, prog_base: &str) -> Result<(), an
                             {
                                 continue;
                             }
-                            parsed_line = replace_map(
+                            replace_map(
                                 config.init.as_ref().unwrap().whitelist.as_ref().unwrap(),
                                 start,
                                 end,
                                 line,
                                 "whitelist",
-                            );
+                            )
                         }
                         "blacklist_map" => {
                             if config.init.as_ref().unwrap().blacklist.is_none()
@@ -105,13 +101,13 @@ fn generate_program(config: Config, out: File, prog_base: &str) -> Result<(), an
                             {
                                 continue;
                             }
-                            parsed_line = replace_map(
+                            replace_map(
                                 config.init.as_ref().unwrap().blacklist.as_ref().unwrap(),
                                 start,
                                 end,
                                 line,
                                 "blacklist",
-                            );
+                            )
                         }
                         "graylist_map" => {
                             if config.init.as_ref().unwrap().graylist.is_none()
@@ -127,13 +123,13 @@ fn generate_program(config: Config, out: File, prog_base: &str) -> Result<(), an
                             {
                                 continue;
                             }
-                            parsed_line = replace_map(
+                            replace_map(
                                 config.init.as_ref().unwrap().graylist.as_ref().unwrap(),
                                 start,
                                 end,
                                 line,
                                 "graylist",
-                            );
+                            )
                         }
                         "whitelist_action" => {
                             if config.init.as_ref().unwrap().whitelist.is_none()
@@ -149,7 +145,7 @@ fn generate_program(config: Config, out: File, prog_base: &str) -> Result<(), an
                             {
                                 continue;
                             }
-                            parsed_line = replace_wb_action(
+                            replace_wb_action(
                                 config
                                     .init
                                     .as_ref()
@@ -162,7 +158,7 @@ fn generate_program(config: Config, out: File, prog_base: &str) -> Result<(), an
                                 end,
                                 line,
                                 "whitelist",
-                            );
+                            )
                         }
                         "blacklist_action" => {
                             if config.init.as_ref().unwrap().blacklist.is_none()
@@ -178,7 +174,7 @@ fn generate_program(config: Config, out: File, prog_base: &str) -> Result<(), an
                             {
                                 continue;
                             }
-                            parsed_line = replace_wb_action(
+                            replace_wb_action(
                                 config
                                     .init
                                     .as_ref()
@@ -191,7 +187,7 @@ fn generate_program(config: Config, out: File, prog_base: &str) -> Result<(), an
                                 end,
                                 line,
                                 "blacklist",
-                            );
+                            )
                         }
                         "graylist_action" => {
                             if config.init.as_ref().unwrap().graylist.is_none()
@@ -207,16 +203,16 @@ fn generate_program(config: Config, out: File, prog_base: &str) -> Result<(), an
                             {
                                 continue;
                             }
-                            parsed_line = replace_g_action(
+                            replace_g_action(
                                 config.init.as_ref().unwrap(),
                                 start,
                                 end,
                                 line,
                                 "graylist",
-                            );
+                            )
                         }
                         _ => {
-                            writer.write((line.to_string() + "\n").as_bytes())?;
+                            writer.write_all((line.to_string() + "\n").as_bytes())?;
                             continue;
                         }
                     };

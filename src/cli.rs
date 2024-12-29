@@ -6,9 +6,9 @@ use clap::{Args, Parser, Subcommand};
 pub struct Options {
     #[command(subcommand)]
     pub command: Commands,
-    /// Config file name [TOML/JSON].
-    #[arg(short, long, global = true, default_value = "")]
-    pub config: String,
+    /// Config file name in TOML/JSON format.
+    #[arg(short, long, global = true)]
+    pub config: Option<String>,
 }
 
 // Subcommands

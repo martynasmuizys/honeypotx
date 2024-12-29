@@ -119,7 +119,7 @@ pub async fn load(options: &mut Load, config: Config) -> Result<usize, anyhow::E
             load_local_temp(options, config, &path).await?;
             return Ok(0);
         } else if action == "2" {
-            return Ok(load_local(options, config, &path)?);
+            return load_local(options, config, &path);
         }
 
         return Err(anyhow!("Cancelled"));
@@ -177,7 +177,7 @@ pub async fn load(options: &mut Load, config: Config) -> Result<usize, anyhow::E
             hostname.unwrap()
         );
         send_file(&config, path, &session, &password)?;
-        load_remote(options, config, &session, &password)?;
+        return load_remote(options, config, &session, &password);
     }
     Ok(0)
 }
@@ -502,7 +502,7 @@ fn send_file(
     let mut channel = session
         .scp_send(Path::new(&path), 0o644, size, None)
         .unwrap();
-    channel.write(&file_contents)?;
+    channel.write_all(&file_contents)?;
     channel.send_eof()?;
     channel.wait_eof()?;
     channel.close()?;

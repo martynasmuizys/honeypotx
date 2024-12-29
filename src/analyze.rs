@@ -154,9 +154,7 @@ fn check_kernel_version(version: &str) -> Result<(), anyhow::Error> {
     for i in 0..3 {
         let ver_num: u32 = version[i].parse().unwrap();
         let min_ver_num: u32 = min_version[i].parse().unwrap();
-        let incompatible;
-
-        match i {
+        let incompatible = match i {
             0 => {
                 if ver_num > min_ver_num {
                     break;
@@ -164,7 +162,7 @@ fn check_kernel_version(version: &str) -> Result<(), anyhow::Error> {
                 if ver_num == min_ver_num {
                     continue;
                 }
-                incompatible = true;
+                true
             }
             1 => {
                 if ver_num > min_ver_num {
@@ -173,7 +171,7 @@ fn check_kernel_version(version: &str) -> Result<(), anyhow::Error> {
                 if ver_num == min_ver_num {
                     continue;
                 }
-                incompatible = true;
+                true
             }
             2 => {
                 if ver_num > min_ver_num {
@@ -182,10 +180,11 @@ fn check_kernel_version(version: &str) -> Result<(), anyhow::Error> {
                 if ver_num == min_ver_num {
                     continue;
                 }
-                incompatible = true;
+                true
             }
             _ => unreachable!("Should not be reached!"),
-        }
+        };
+
         if incompatible {
             return Err(anyhow!(
                 "Incompatible kernel version!\nMinimal compatible version: {}",

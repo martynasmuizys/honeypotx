@@ -54,7 +54,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let working_dir = Path::new(
         WORKING_DIR
             .to_str()
-            .with_context(|| format!("Failed to parse HOME directory"))?,
+            .with_context(|| "Failed to parse HOME directory".to_string())?,
     );
 
     if !working_dir.exists()
@@ -64,7 +64,7 @@ async fn main() -> Result<(), anyhow::Error> {
         fs::create_dir_all(format!("{}/out", working_dir.display()))?;
         fs::create_dir(format!("{}/scripts", working_dir.display()))?;
         Command::new("sh")
-            .args(&[
+            .args([
                 "-c",
                 format!(
                     "bpftool btf dump file /sys/kernel/btf/vmlinux format c > {}/out/vmlinux.h",
@@ -76,38 +76,43 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     let options = Options::parse();
-
-    let config_file = Path::new(&options.config);
-
-    let user_config_file;
     let config: Config;
 
-    if !config_file.exists() && !options.config.is_empty() {
-        return Err(anyhow!(
-            "File does not exist!\nSearched locations: {}",
-            config_file.display()
-        ));
-    }
+    let config_path = options.config;
+    if let Some(c) = config_path {
+        let config_file = Path::new(&c);
 
-    match config_file.extension() {
-        Some(e) => match e.to_str().unwrap() {
-            "json" => {
-                user_config_file = fs::read_to_string(config_file)?;
-                config = serde_json::from_str(&user_config_file)?;
-            }
-            "toml" => {
-                user_config_file = fs::read_to_string(config_file)?;
-                config = toml::from_str(&user_config_file)?;
-            }
-            _ => {
-                return Err(anyhow!(
-                    "File type is not supported!\nSuppored file types: JSON, TOML."
-                ));
-            }
-        },
-        None => {
-            config = Config::default();
+        let user_config_file;
+
+        if !config_file.exists() && !c.is_empty() {
+            return Err(anyhow!(
+                "File does not exist!\nSearched locations: {}",
+                config_file.display()
+            ));
         }
+
+        match config_file.extension() {
+            Some(e) => match e.to_str().unwrap() {
+                "json" => {
+                    user_config_file = fs::read_to_string(config_file)?;
+                    config = serde_json::from_str(&user_config_file)?;
+                }
+                "toml" => {
+                    user_config_file = fs::read_to_string(config_file)?;
+                    config = toml::from_str(&user_config_file)?;
+                }
+                _ => {
+                    return Err(anyhow!(
+                        "File type is not supported!\nSuppored file types: JSON, TOML."
+                    ));
+                }
+            },
+            None => {
+                config = Config::default();
+            }
+        }
+    } else {
+        config = Config::default();
     }
 
     match options.command {
@@ -121,7 +126,7 @@ async fn main() -> Result<(), anyhow::Error> {
             load(&mut options, config).await?;
         }
         Commands::Unload(mut options) => unload(&mut options, config)?,
-        Commands::Secret => secret::secret(),
+        Commands::Secret => secret::secret().await?,
         Commands::Run(options) => {
             let result = run_script(
                 WORKING_DIR
