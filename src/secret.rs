@@ -75,14 +75,19 @@ pub static GOSLING: &str = "              ░░██████████�
 ";
 
 pub async fn secret() -> Result<(), anyhow::Error> {
-    let (_stream, stream_handle) = OutputStream::try_default()?;
-
-    let song = include_bytes!("../audio/let_it_happen.mp3").to_vec();
-    let source = Decoder::new(Cursor::new(Arc::from(song.as_ref())))?;
-
-    stream_handle.play_raw(source.convert_samples())?;
-
     println!("{}", GOSLING);
-    signal::ctrl_c().await?;
+
+    #[allow(unexpected_cfgs)]
+    if cfg!(audio_available = "true") {
+        let (_stream, stream_handle) = OutputStream::try_default()?;
+        let song = include_bytes!("../audio/let_it_happen.mp3").to_vec();
+        let source = Decoder::new(Cursor::new(Arc::from(song.as_ref())))?;
+
+        stream_handle.play_raw(source.convert_samples())?;
+
+        signal::ctrl_c().await?;
+    };
+    #[warn(unexpected_cfgs)]
+
     Ok(())
 }
