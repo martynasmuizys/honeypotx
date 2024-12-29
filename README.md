@@ -1,5 +1,5 @@
 # HPX
-HPX is a highly configurable new generation type of honeypot which adopts eBPF technology.
+HPX is a highly configurable new generation type of honeypot generator tool which adopts eBPF technology.
 
 ![Gosling](https://media.tenor.com/Vlr5ep-dRXMAAAAM/ryan-gosling-blade-runner2049.gif)
 
