@@ -1,16 +1,17 @@
 # HPX
+HPX is a highly configurable new generation type of honeypot which adopts eBPF technology.
+
+![Gosling](https://media.tenor.com/Vlr5ep-dRXMAAAAM/ryan-gosling-blade-runner2049.gif)
+
 ## Table of Contents
-- [About](#-about)
 - [Installation](#-installation)
   - [Cargo](#-cargo)
   - [Usage](#-usage)
 - [Configuration](#-configuration)
-## About
-HPX is a highly configurable new generation type of honeypot which adopts eBPF technology.
 
 ## Installation
-First make sure [Rust](https://github.com/rust-lang/rust) toolchain is installed. It is recommened to use [rustup](https://rustup.rs/) installation method.
 ### Cargo
+First make sure [Rust](https://github.com/rust-lang/rust) toolchain is installed (it is recommened to use [rustup](https://rustup.rs/) installation method).
 ```bash
 cargo install --git https://github.com/martynasmuizys/hpx.git
 ```
