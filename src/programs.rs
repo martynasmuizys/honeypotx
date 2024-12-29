@@ -3,7 +3,7 @@ use std::{collections::HashMap, os::fd::AsFd};
 use anyhow::Context;
 use libbpf_rs::{Object, ProgramImpl, Xdp};
 
-use crate::{helpers, Load};
+use crate::{cli::Load, helpers};
 
 pub fn get_programs<'a>(object: &'a Object) -> Option<HashMap<String, ProgramImpl<'a>>> {
     let programs = object.progs();

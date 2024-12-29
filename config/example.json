@@ -6,15 +6,15 @@
         "username": "bobthebuilder",
         "iface": "eth0",
         "prog_type": "ip",
-        "blacklist": {
-            "enabled": false,
-            "max": 32,
-            "action": "deny"
-        },
         "whitelist": {
             "enabled": false,
             "max": 32,
             "action": "allow"
+        },
+        "blacklist": {
+            "enabled": false,
+            "max": 32,
+            "action": "deny"
         },
         "graylist": {
             "enabled": false,
@@ -25,8 +25,8 @@
         }
     },
     "data": {
-        "whitelist": [],
-        "blacklist": [],
+        "whitelist": ["192.168.1.103"],
+        "blacklist": ["192.168.1.203"],
         "graylist": []
     }
 }

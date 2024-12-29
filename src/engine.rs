@@ -7,11 +7,11 @@ use std::{
 use anyhow::{anyhow, Context};
 
 use crate::{
-    config::{Config, Init, List, DEFAULT_FREQUENCY},
-    snippets::{ACTION, BASE_DNS, BASE_IP, GET_DATA_DNS, GET_DATA_IP, GRAYLIST, MAP}, Generate, WORKING_DIR,
+    cli::Generate, config::{Config, Init, List, DEFAULT_FREQUENCY}, snippets::{ACTION, BASE_DNS, BASE_IP, GET_DATA_DNS, GET_DATA_IP, GRAYLIST, MAP}, WORKING_DIR
 };
 
 pub fn generator(_options: Generate, config: Config) -> Result<(bool, String), anyhow::Error> {
+    dbg!(sudo::check());
     let out = format!(
         "{}/out/generated.c",
         WORKING_DIR

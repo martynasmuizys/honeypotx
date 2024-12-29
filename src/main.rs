@@ -1,8 +1,10 @@
 #![feature(sync_unsafe_cell)]
 
 mod analyze;
+mod cli;
 mod config;
 mod engine;
+mod get;
 mod helpers;
 mod load;
 mod lua;
@@ -15,9 +17,11 @@ mod unload;
 
 use analyze::analyze;
 use anyhow::{anyhow, Context};
-use clap::{Args, Parser, Subcommand};
+use clap::Parser;
+use cli::{Commands, Get, Options};
 use config::Config;
 use engine::generator;
+use get::{get_base_config, get_default_config, get_example_config};
 use home::home_dir;
 use load::load;
 use lua::run_script;
@@ -30,63 +34,6 @@ use std::{
     sync::LazyLock,
 };
 use unload::unload;
-
-#[derive(Parser, Debug)]
-#[command(version, about, long_about = None)]
-pub struct Options {
-    #[command(subcommand)]
-    command: Commands,
-    /// Config file name [TOML/JSON].
-    #[arg(short, long, default_value = "")]
-    config: String,
-}
-
-#[derive(Args, Debug)]
-pub struct Run {
-    /// Path of LUA script
-    #[arg(short, long, required = true, default_value = None)]
-    path: Option<String>,
-}
-
-#[derive(Args, Debug)]
-pub struct Analyze {}
-
-#[derive(Args, Debug)]
-struct Generate {}
-
-#[derive(Args, Debug)]
-pub struct Load {
-    /// Interface name.
-    #[arg(short, long, default_value = "")]
-    iface: String,
-    /// XdpFlags to pass to XDP framework. Available options: generic, native, offloaded.
-    #[arg(long, default_value = "generic")]
-    xdp_flags: String,
-}
-
-#[derive(Args, Debug)]
-pub struct Unload {
-    /// Interface name.
-    #[arg(short, long, default_value = "")]
-    iface: String,
-    /// XdpFlags to pass to XDP framework. Available options: generic, native, offloaded.
-    #[arg(long, default_value = "generic")]
-    xdp_flags: String,
-    /// Program ID.
-    #[arg(short, long, default_value = "")]
-    pid: String,
-}
-
-#[derive(Debug, Subcommand)]
-enum Commands {
-    /// Generates eBPF program on provided or default config
-    Generate(Generate),
-    Load(Load),
-    Unload(Unload),
-    Analyze(Analyze),
-    Secret,
-    Run(Run),
-}
 
 pub static WORKING_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     format!(
@@ -188,6 +135,11 @@ async fn main() -> Result<(), anyhow::Error> {
                 Err(e) => return Err(anyhow!("{}", e)),
             };
         }
+        Commands::Get(opt) => match opt {
+            Get::DefaultConfig(o) => get_default_config(o)?,
+            Get::ExampleConfig(o) => get_example_config(o)?,
+            Get::BaseConfig(o) => get_base_config(o)?,
+        },
     }
 
     Ok(())

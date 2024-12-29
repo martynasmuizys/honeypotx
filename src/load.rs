@@ -23,9 +23,7 @@ use ssh2::Session;
 use tokio::signal;
 
 use crate::{
-    config::DEFAULT_NET_IFACE,
-    maps::{self, load_map_data_local, load_map_data_local_temp, load_map_data_remote},
-    objects, programs, Config, Load, SSH_PASS, WORKING_DIR,
+    cli::Load, config::DEFAULT_NET_IFACE, maps::{self, load_map_data_local, load_map_data_local_temp, load_map_data_remote}, objects, programs, Config, SSH_PASS, WORKING_DIR
 };
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -97,7 +95,7 @@ pub async fn load(options: &mut Load, config: Config) -> Result<usize, anyhow::E
         || *hostname.as_ref().unwrap() == "127.0.0.1"
     {
         match sudo::check() {
-            sudo::RunningAs::Root => println!("{}: Running as sudo ✔︎", "Load".red().bold()),
+            sudo::RunningAs::Root => (),
             sudo::RunningAs::User => {
                 println!("{}: Requesting sudo privileges", "Load".red().bold());
                 let _ = sudo::with_env(&["HOME"]);

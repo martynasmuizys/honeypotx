@@ -1,12 +1,12 @@
 use std::{fs, path::Path};
 
 use crossterm::style::Stylize;
-use mlua::{ExternalResult, Lua};
+use mlua::{ExternalResult, Lua, LuaSerdeExt};
 use serde::Serialize;
+use serde_json::Value as JsonValue;
 
 use crate::{
-    analyze, config::Config, engine::generator, load::load, maps::get_map_data, unload::unload,
-    Analyze, Generate, Load, Unload,
+    analyze, cli::{Analyze, Generate, Load, Unload}, config::Config, engine::generator, load::load, maps::get_map_data, unload::unload
 };
 
 pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Result<()> {
@@ -27,15 +27,15 @@ pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Resu
         let lua = Lua::new();
 
         let analyze_func = lua.create_function(|lua, cfg: mlua::Table| -> mlua::Result<bool> {
-                if std::env::var("ANALYZED").unwrap_or("0".to_string()) == "1" {
-                    return Ok(true);
-                }
+            if std::env::var("HPX_ANALYZED").unwrap_or("0".to_string()) == "1" {
+                return Ok(true);
+            }
             let val = cfg.serialize(mlua::serde::Serializer::new(lua))?;
             let json_data = serde_json::to_string(&val).map_err(mlua::Error::external)?;
             let config: Config = serde_json::from_str(&json_data).map_err(mlua::Error::external)?;
             match analyze(Analyze {}, config) {
                 Ok(ret) => {
-                    std::env::set_var("ANALYZED", "1");
+                    std::env::set_var("HPX_ANALYZED", "1");
                     Ok(ret)
                 }
                 Err(e) => Err(mlua::Error::runtime(e)),
@@ -44,7 +44,7 @@ pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Resu
 
         let generate_func =
             lua.create_function(|lua, cfg: mlua::Table| -> mlua::Result<(bool, String)> {
-                if std::env::var("GENERATED").unwrap_or("0".to_string()) == "1" {
+                if std::env::var("HPX_GENERATED").unwrap_or("0".to_string()) == "1" {
                     return Ok((false, "".to_string()));
                 }
                 let val = cfg.serialize(mlua::serde::Serializer::new(lua))?;
@@ -53,7 +53,7 @@ pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Resu
                     serde_json::from_str(&json_data).map_err(mlua::Error::external)?;
                 match generator(Generate {}, config) {
                     Ok(ret) => {
-                        std::env::set_var("GENERATED", "1");
+                        std::env::set_var("HPX_GENERATED", "1");
                         Ok(ret)
                     }
                     Err(e) => Err(mlua::Error::runtime(e)),
@@ -67,14 +67,7 @@ pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Resu
                 let config: Config =
                     serde_json::from_str(&json_data).map_err(mlua::Error::external)?;
 
-                match sudo::check() {
-                    sudo::RunningAs::Root => println!("{}: Running as sudo ✔︎", "Run".red().bold()),
-                    sudo::RunningAs::User => {
-                        println!("{}: Requesting sudo privileges", "Unload".red().bold());
-                        let _ = sudo::with_env(&["HOME", "ANALYZED", "GENERATED"]);
-                    }
-                    sudo::RunningAs::Suid => (),
-                }
+                check_sudo();
 
                 match load(
                     &mut Load {
@@ -105,14 +98,7 @@ pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Resu
                 let config: Config =
                     serde_json::from_str(&json_data).map_err(mlua::Error::external)?;
 
-                match sudo::check() {
-                    sudo::RunningAs::Root => println!("{}: Running as sudo ✔︎", "Run".red().bold()),
-                    sudo::RunningAs::User => {
-                        println!("{}: Requesting sudo privileges", "Unload".red().bold());
-                        let _ = sudo::with_env(&["HOME", "ANALYZED", "GENERATED"]);
-                    }
-                    sudo::RunningAs::Suid => (),
-                }
+                check_sudo();
 
                 match unload(
                     &mut Unload {
@@ -137,17 +123,14 @@ pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Resu
                 let config: Config =
                     serde_json::from_str(&json_data).map_err(mlua::Error::external)?;
 
-                match sudo::check() {
-                    sudo::RunningAs::Root => println!("{}: Running as sudo ✔︎", "Run".red().bold()),
-                    sudo::RunningAs::User => {
-                        println!("{}: Requesting sudo privileges", "Unload".red().bold());
-                        let _ = sudo::with_env(&["HOME", "ANALYZED", "GENERATED"]);
-                    }
-                    sudo::RunningAs::Suid => (),
-                }
+                check_sudo();
 
                 match get_map_data(&config, &map_name.to_string_lossy()) {
-                    Ok(ret) => Ok(ret),
+                    Ok(ret) => {
+                        let json: JsonValue =
+                            serde_json::from_str(&ret).map_err(mlua::Error::external)?;
+                        Ok(lua.to_value(&json)?)
+                    }
                     Err(e) => Err(mlua::Error::runtime(e)),
                 }
             })?;
@@ -160,7 +143,20 @@ pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Resu
 
         let run = fs::read_to_string(path)?;
         lua.load(run).eval_async::<()>().await?;
+        std::env::remove_var("HPX_ANALYZED");
+        std::env::remove_var("HPX_GENERATED");
     }
 
     Ok(())
+}
+
+fn check_sudo() {
+    match sudo::check() {
+        sudo::RunningAs::Root => (),
+        sudo::RunningAs::User => {
+            println!("{}: Requesting sudo privileges", "Unload".red().bold());
+            let _ = sudo::with_env(&["HOME", "HPX_ANALYZED", "HPX_GENERATED"]);
+        }
+        sudo::RunningAs::Suid => (),
+    }
 }

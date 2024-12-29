@@ -7,8 +7,9 @@ use anyhow::{anyhow, Context};
 use crossterm::style::Stylize;
 use ssh2::Session;
 
+use crate::cli::Unload;
 use crate::config::DEFAULT_NET_IFACE;
-use crate::{Config, Unload, SSH_PASS, WORKING_DIR};
+use crate::{Config, SSH_PASS, WORKING_DIR};
 
 pub fn unload(options: &mut Unload, config: Config) -> Result<(), anyhow::Error> {
     let hostname = config.init.as_ref().unwrap().hostname.as_ref();
@@ -53,7 +54,7 @@ pub fn unload(options: &mut Unload, config: Config) -> Result<(), anyhow::Error>
         || *hostname.as_ref().unwrap() == "127.0.0.1"
     {
         match sudo::check() {
-            sudo::RunningAs::Root => println!("{}: Running as sudo ✔︎", "Unload".red().bold()),
+            sudo::RunningAs::Root => (),
             sudo::RunningAs::User => {
                 println!("{}: Requesting sudo privileges", "Unload".red().bold());
                 let _ = sudo::with_env(&["HOME"]);

@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use crossterm::style::Stylize;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 pub static DEFAULT_NET_IFACE: &str = "eth0";
 pub static DEFAULT_FREQUENCY: u32 = 1000;
@@ -12,13 +12,13 @@ static DEFAULT_WHITELIST_ACTION: &str = "allow";
 static DEFAULT_BLACKLIST_ACTION: &str = "deny";
 static DEFAULT_GRAYLIST_ACTION: &str = "investigate";
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
     pub init: Option<Init>,
     pub data: Option<Data>
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Init {
     pub name: Option<String>,
     pub hostname: Option<String>,
@@ -31,28 +31,28 @@ pub struct Init {
     pub graylist: Option<Graylist>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Data {
     pub whitelist: Option<Vec<String>>,
     pub blacklist: Option<Vec<String>>,
     pub graylist: Option<Vec<String>>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Whitelist {
     pub enabled: Option<bool>,
     pub max: Option<u32>,
     pub action: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Blacklist {
     pub enabled: Option<bool>,
     pub max: Option<u32>,
     pub action: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Graylist {
     pub enabled: Option<bool>,
     pub max: Option<u32>,

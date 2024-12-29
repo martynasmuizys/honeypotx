@@ -6,8 +6,8 @@ use anyhow::anyhow;
 use crossterm::style::Stylize;
 use ssh2::Session;
 
+use crate::cli::Analyze;
 use crate::config::Config;
-use crate::Analyze;
 
 static MIN_KERNEL_VERSION: &str = "5.16.0";
 static UBUNTU_PACKAGES: [&str; 4] = [
