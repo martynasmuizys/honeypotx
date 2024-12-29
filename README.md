@@ -75,11 +75,11 @@ The following is a sample config.json file:
 You can use Lua to automate programs execution. Only part of API is availabl with Lua scripting:
 | Function | Input | Output | Description |
 | ---| --- | --- | --- |
-| `analyze(opts)` | <pre>opts = {<br>&nbsp config<br>}</pre> | `boolean` | Analyze system's compatibility with eBPF |
-| `generate(opts)` | <pre>opts = {<br>&nbsp config<br>}</pre> | `(boolean, string)` | Generate eBPF program |
-| `pload(opts)` | <pre>opts = {<br>&nbsp config,<br>&nbsp iface,<br>&nbsp xdp_flags<br>}</pre> | `number` | Load eBPF program |
-| `punload(opts)` | <pre>opts = {<br>&nbsp config,<br>&nbsp iface,<br>&nbsp xdp_flags,<br>&nbsp prog_id<br>}</pre> | `nil` | Unload eBPF program |
-| `get_map_data(opts)` | <pre>opts = {<br>&nbsp config,<br>&nbsp map_name<br>}</pre> | `table` | Get map data |
+| `analyze(opts)` | <pre>opts = {<br>&nbsp;config<br>}</pre> | `boolean` | Analyze system's compatibility with eBPF |
+| `generate(opts)` | <pre>opts = {<br>&nbsp;config<br>}</pre> | `(boolean, string)` | Generate eBPF program |
+| `pload(opts)` | <pre>opts = {<br>&nbsp;config,<br>&nbsp;iface,<br>&nbsp;xdp_flags<br>}</pre> | `number` | Load eBPF program |
+| `punload(opts)` | <pre>opts = {<br>&nbsp;config,<br>&nbsp;iface,<br>&nbsp;xdp_flags,<br>&nbsp;prog_id<br>}</pre> | `nil` | Unload eBPF program |
+| `get_map_data(opts)` | <pre>opts = {<br>&nbsp;config,<br>&nbsp;map_name<br>}</pre> | `table` | Get map data |
 
 To run Lua script with HPX:
 ```bash
