@@ -1,5 +1,7 @@
+use crossterm::style::Stylize;
+
 use crate::{
-    cli::ConfOutputType,
+    cli::{ConfOutputType, LuaFunc},
     config::{Blacklist, Config, Data, Graylist, Init, Whitelist},
 };
 
@@ -103,4 +105,39 @@ pub fn get_base_config(o: ConfOutputType) -> Result<(), anyhow::Error> {
     }
 
     Ok(())
+}
+
+pub fn get_lua_api() {
+    println!(
+        "{}(opts) - analyzes systems compatibility with eBPF",
+        "analyze".bold().blue()
+    );
+    println!(
+        "{}(opts) - generates eBPF program on provided config",
+        "generate".bold().blue()
+    );
+    println!(
+        "{}(opts) - loads eBPF program to kernel",
+        "pload".bold().blue()
+    );
+    println!(
+        "{}(opts) - unloads eBPF program from kernel",
+        "punload".bold().blue()
+    );
+    println!(
+        "{}(opts) - gets map data of loaded eBPF program",
+        "get_map_data".bold().blue()
+    );
+}
+
+pub fn get_lua_func_opts(o: LuaFunc) {
+    match o {
+        LuaFunc::Analyze => println!("opts = {{\n    config\n}}"),
+        LuaFunc::Generate => println!("opts = {{\n    config\n}}"),
+        LuaFunc::PLoad => println!("opts = {{\n    config,\n    iface,\n    xdp_flags\n}}"),
+        LuaFunc::PUnload => {
+            println!("opts = {{\n    config,\n    iface,\n    xdp_flags,\n    prog_id\n}}")
+        }
+        LuaFunc::Get_map_data => println!("opts = {{\n    config,\n    map_name\n}}"),
+    }
 }

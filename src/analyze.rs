@@ -1,15 +1,17 @@
+use std::cell::SyncUnsafeCell;
 use std::io::{self, Read, Write};
 use std::net::TcpStream;
 use std::process::Command;
+use std::sync::Mutex;
 
 use anyhow::anyhow;
-use crossterm::style::Stylize;
+use crossterm::style::{style, Stylize};
 use ssh2::Session;
 
 use crate::cli::Analyze;
 use crate::config::Config;
 
-static MIN_KERNEL_VERSION: &str = "5.16.0";
+static MIN_KERNEL_VERSION: &str = "5.17.0";
 static UBUNTU_PACKAGES: [&str; 4] = [
     "linux-tools-common",
     "linux-tools-generic",
@@ -18,7 +20,14 @@ static UBUNTU_PACKAGES: [&str; 4] = [
 ];
 static ARCH_PACKAGES: [&str; 4] = ["bpf", "base", "base-devel", "ripgrep"];
 
+static MISSING_PACKAGES: SyncUnsafeCell<Mutex<Vec<&str>>> =
+    SyncUnsafeCell::new(Mutex::new(Vec::new()));
+
 pub fn analyze(_options: Analyze, config: Config) -> Result<bool, anyhow::Error> {
+    let mut total_errors = 0;
+    let mut error_messages: Vec<anyhow::Error> = Vec::new();
+    let mut skip_flag_check = false;
+
     println!("{}\n", "- CONFIG -".on_blue().black());
     let mut action = String::new();
 
@@ -26,7 +35,7 @@ pub fn analyze(_options: Analyze, config: Config) -> Result<bool, anyhow::Error>
 
     print!(
         "{}: Using config above. Proceed? [Y/n] ",
-        "Load".blue().bold()
+        "Analyze".blue().bold()
     );
     io::stdout().flush()?;
     io::stdin().read_line(&mut action)?;
@@ -52,21 +61,57 @@ pub fn analyze(_options: Analyze, config: Config) -> Result<bool, anyhow::Error>
             "Analyze".blue().bold(),
             &output.trim()
         );
-        check_kernel_version(&output)?;
+        match check_kernel_version(&output) {
+            Ok(_) => (),
+            Err(e) => {
+                total_errors += 1;
+                error_messages.push(e);
+            }
+        };
 
         println!("{}", "- Required Packages Check -".on_blue().black());
         output = String::from_utf8(Command::new("uname").arg("-n").output().unwrap().stdout)?;
-        check_packages(output.trim())?;
+
+        match check_packages(output.trim()) {
+            Ok(_) => (),
+            Err(e) => {
+                unsafe {
+                    let pkgs = MISSING_PACKAGES.get().as_mut().unwrap();
+                    skip_flag_check = pkgs.lock().unwrap().contains(&"ripgrep");
+                }
+                total_errors += 1;
+                error_messages.push(e);
+            }
+        };
 
         println!("{}", "- Kernel Flags Check -".on_blue().black());
-        output = String::from_utf8(
-            Command::new("sh")
-                .args(["-c", "sudo bpftool feature | rg -w 'CONFIG_BPF|CONFIG_BPF_SYSCALL|CONFIG_BPF_JIT|CONFIG_BPF_EVENTS'"])
-                .output()
-                .unwrap()
+
+        if !skip_flag_check {
+            output = String::from_utf8(
+                Command::new("sh")
+                    .args(["-c", "sudo bpftool feature | rg -w 'CONFIG_BPF|CONFIG_BPF_SYSCALL|CONFIG_BPF_JIT|CONFIG_BPF_EVENTS'"])
+                    .output()
+                    .unwrap()
                 .stdout,
-        )?;
-        check_bpf_enabled(output.trim().split("\n").collect())?;
+            )?;
+            match check_bpf_enabled(output.trim().split("\n").collect()) {
+                Ok(_) => (),
+                Err(e) => {
+                    total_errors += 1;
+                    error_messages.push(e);
+                }
+            };
+        } else {
+            println!(
+                "{}: Required kernel flags {}\n",
+                "Analyze".blue().bold(),
+                "(not ok)".red().bold()
+            );
+            error_messages.push(anyhow!(
+                "Cannot check kernel flags without \"ripgrep\" package"
+            ));
+            total_errors += 1;
+        }
 
         println!("{}", "- Network Interface Check -".on_blue().black());
         output = String::from_utf8(
@@ -76,21 +121,19 @@ pub fn analyze(_options: Analyze, config: Config) -> Result<bool, anyhow::Error>
                 .unwrap()
                 .stdout,
         )?;
-        check_net_iface(
+        match check_net_iface(
             config.init.as_ref().unwrap().iface.as_ref().unwrap(),
             output.split("\n").collect(),
-        )?;
-
-        return Ok(true);
-    }
-
-    if hostname.is_some() {
-        let tcp = TcpStream::connect(format!(
-            "{}:{}",
-            hostname.unwrap(),
-            port.unwrap_or(&22)
-        ))
-        .unwrap();
+        ) {
+            Ok(_) => (),
+            Err(e) => {
+                total_errors += 1;
+                error_messages.push(e);
+            }
+        };
+    } else if hostname.is_some() {
+        let tcp =
+            TcpStream::connect(format!("{}:{}", hostname.unwrap(), port.unwrap_or(&22))).unwrap();
         let mut session = Session::new().unwrap();
         session.set_tcp_stream(tcp);
         session.handshake().unwrap();
@@ -127,21 +170,82 @@ pub fn analyze(_options: Analyze, config: Config) -> Result<bool, anyhow::Error>
         );
 
         println!("{}", "- Kernel Version Check -".on_blue().black());
-        check_kernel_version_remote(&mut session)?;
+        match check_kernel_version_remote(&mut session) {
+            Ok(_) => (),
+            Err(e) => {
+                total_errors += 1;
+                error_messages.push(e);
+            }
+        };
 
         println!("{}", "- Required Packages Check -".on_blue().black());
-        check_packages_remote(&mut session, &password)?;
+        match check_packages_remote(&mut session, &password) {
+            Ok(_) => (),
+            Err(e) => {
+                unsafe {
+                    let pkgs = MISSING_PACKAGES.get().as_mut().unwrap();
+                    skip_flag_check = pkgs.lock().unwrap().contains(&"ripgrep");
+                }
+                total_errors += 1;
+                error_messages.push(e);
+            }
+        };
 
         println!("{}", "- Kernel Flags Check -".on_blue().black());
-        check_bpf_enabled_remote(&mut session, &password)?;
+        if !skip_flag_check {
+            match check_bpf_enabled_remote(&mut session, &password) {
+                Ok(_) => (),
+                Err(e) => {
+                    total_errors += 1;
+                    error_messages.push(e);
+                }
+            };
+        } else {
+            println!(
+                "{}: Required kernel flags {}\n",
+                "Analyze".blue().bold(),
+                "(not ok)".red().bold()
+            );
+            error_messages.push(anyhow!(
+                "Cannot check kernel flags without \"ripgrep\" package"
+            ));
+            total_errors += 1;
+        }
 
         println!("{}", "- Network Interface Check -".on_blue().black());
-        check_net_iface_remote(
+        match check_net_iface_remote(
             &mut session,
             config.init.as_ref().unwrap().iface.as_ref().unwrap(),
-        )?;
+        ) {
+            Ok(_) => (),
+            Err(e) => {
+                total_errors += 1;
+                error_messages.push(e);
+            }
+        };
     }
 
+    let total_errors_display;
+    if total_errors != 0 {
+        total_errors_display = style(total_errors).red().bold();
+        println!("{}", "- Error List -".on_red().black());
+    } else {
+        total_errors_display = style(total_errors).red().bold();
+    }
+
+    for e in error_messages {
+        println!("{}: {}", "Analyze Error".red().bold(), e);
+    }
+
+    println!(
+        "\n{}: Operating system analysis complete.",
+        "Analyze".blue().bold(),
+    );
+    println!(
+        "{}: Total errors: {}",
+        "Analyze".blue().bold(),
+        total_errors_display
+    );
     Ok(true)
 }
 
@@ -186,13 +290,22 @@ fn check_kernel_version(version: &str) -> Result<(), anyhow::Error> {
         };
 
         if incompatible {
+            println!(
+                "{}: Kernel version {}\n",
+                "Analyze".blue().bold(),
+                "(not ok)".red().bold()
+            );
             return Err(anyhow!(
                 "Incompatible kernel version!\nMinimal compatible version: {}",
                 MIN_KERNEL_VERSION
             ));
         }
     }
-    println!("{}: Kernel version compatible ✔︎\n", "Analyze".blue().bold());
+    println!(
+        "{}: Kernel version {}\n",
+        "Analyze".blue().bold(),
+        "(ok)".green().bold()
+    );
     Ok(())
 }
 
@@ -284,30 +397,49 @@ fn check_packages(nodename: &str) -> Result<(), anyhow::Error> {
         let action = action.trim().to_lowercase();
 
         if action != "y" && action != "yes" && !action.is_empty() {
-            return Err(anyhow!("Cannot proceed with missing packages!"));
+            println!(
+                "{}: Required packages {}\n",
+                "Analyze".blue().bold(),
+                "(not ok)".red().bold(),
+            );
+            unsafe {
+                let pkgs = MISSING_PACKAGES.get().as_mut().unwrap();
+                pkgs.lock().unwrap().append(&mut missing_pgks.clone());
+            }
+            return Err(anyhow!(format!(
+                "Missing packages:\n - {}",
+                missing_pgks.join("\n - ")
+            )));
         }
-        //let password = rpassword::prompt_password("Password: ").unwrap();
         match nodename {
             "ubuntu" => {
-                Command::new("sudo")
-                    .arg("apt install --assume-yes")
-                    .arg(missing_pgks.join(" "))
+                Command::new("sh")
+                    .args([
+                        "-c",
+                        format!("apt install --assume-yes {}", missing_pgks.join(" ")).as_str(),
+                    ])
                     .output()?;
             }
             "archlinux" => {
-                Command::new("sudo")
-                    .arg("pacman --noconfirm -S")
-                    .arg(missing_pgks.join(" "))
+                Command::new("sh")
+                    .args([
+                        "-c",
+                        format!("sudo pacman --noconfirm -S {}", missing_pgks.join(" ")).as_str(),
+                    ])
                     .output()?;
             }
             _ => return Err(anyhow!("Unsupported OS: {}", output)),
         }
         println!(
-            "{}: Missing packages installed succefully ✔︎",
+            "{}: Missing packages installed succefully.",
             "Analyze".blue().bold()
         );
     } else {
-        println!("{}: All packages installed ✔︎\n", "Analyze".blue().bold());
+        println!(
+            "{}: Required packages {}\n",
+            "Analyze".blue().bold(),
+            "(ok)".green().bold(),
+        );
     }
     Ok(())
 }
@@ -384,7 +516,14 @@ fn check_packages_remote(session: &mut Session, password: &str) -> Result<(), an
         let action = action.trim().to_lowercase();
 
         if action != "y" && action != "yes" && !action.is_empty() {
-            return Err(anyhow!("Cannot proceed with missing packages!"));
+            unsafe {
+                let pkgs = MISSING_PACKAGES.get().as_mut().unwrap();
+                pkgs.lock().unwrap().append(&mut missing_pgks.clone());
+            }
+            return Err(anyhow!(format!(
+                "Missing packages:\n - {}",
+                missing_pgks.join("\n - ")
+            )));
         }
         match nodename.as_str() {
             "ubuntu" => {
@@ -424,11 +563,15 @@ fn check_packages_remote(session: &mut Session, password: &str) -> Result<(), an
             _ => return Err(anyhow!("Unsupported OS: {}", output)),
         }
         println!(
-            "{}: Missing packages installed succefully ✔︎",
+            "{}: Missing packages installed succefully.",
             "Analyze".blue().bold()
         );
     } else {
-        println!("{}: All packages installed ✔︎\n", "Analyze".blue().bold());
+        println!(
+            "{}: Required packages {}\n",
+            "Analyze".blue().bold(),
+            "(ok)".green().bold(),
+        );
     }
     channel.wait_close()?;
     Ok(())
@@ -451,17 +594,14 @@ fn check_bpf_enabled(flags: Vec<&str>) -> Result<(), anyhow::Error> {
     }
 
     println!(
-        "{}: Required kernel flags enabled ✔︎\n",
-        "Analyze".blue().bold()
+        "{}: Required kernel flags {}\n",
+        "Analyze".blue().bold(),
+        "(ok)".green().bold()
     );
 
     Ok(())
 }
 fn check_bpf_enabled_remote(session: &mut Session, password: &str) -> Result<(), anyhow::Error> {
-    println!(
-        "{}: Checking required kernel flags",
-        "Analyze".blue().bold()
-    );
     let mut channel = session.channel_session().unwrap();
     channel
         .exec( format!(
@@ -497,11 +637,18 @@ fn check_bpf_enabled_remote(session: &mut Session, password: &str) -> Result<(),
 fn check_net_iface(iface: &str, ifaces: Vec<&str>) -> Result<(), anyhow::Error> {
     if ifaces.contains(&iface) {
         println!(
-            "{}: Interface \"{}\" is available ✔︎\n",
+            "{}: Network interface \"{}\" {}\n",
             "Analyze".blue().bold(),
-            iface.bold()
+            iface.bold(),
+            "(ok)".green().bold(),
         );
     } else {
+        println!(
+            "{}: Network interface \"{}\" {}\n",
+            "Analyze".blue().bold(),
+            iface.bold(),
+            "(not ok)".red().bold(),
+        );
         return Err(anyhow!("Interface \"{}\" is not available", iface.bold()));
     }
 
@@ -512,7 +659,11 @@ fn check_net_iface_remote(session: &mut Session, iface: &str) -> Result<(), anyh
     println!("{}: Checking network interfaces", "Analyze".blue().bold());
     let mut channel = session.channel_session().unwrap();
     channel
-        .exec("ip -o link show | awk -F': ' '{print $2}'".to_string().as_str())
+        .exec(
+            "ip -o link show | awk -F': ' '{print $2}'"
+                .to_string()
+                .as_str(),
+        )
         .unwrap();
     let mut output = String::new();
     channel.read_to_string(&mut output).unwrap();

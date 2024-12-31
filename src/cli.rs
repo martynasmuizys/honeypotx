@@ -76,6 +76,10 @@ pub enum Get {
     ExampleConfig(ConfOutputType),
     /// Get starter configuration
     BaseConfig(ConfOutputType),
+    /// Get available Lua API
+    LuaApi,
+    #[command(subcommand)]
+    LuaFuncOpts(LuaFunc)
 }
 
 #[derive(Args, Debug)]
@@ -89,4 +93,17 @@ pub struct ConfOutputType {
     /// Visualize configuration
     #[arg(short, long, default_missing_value = "", num_args = 0)]
     pub formatted: Option<String>,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum LuaFunc {
+    Analyze,
+    Generate,
+    #[command(name = "pload")]
+    PLoad,
+    #[command(name = "punload")]
+    PUnload,
+    #[allow(non_camel_case_types)]
+    #[command(name = "get_map_data")]
+    Get_map_data,
 }

@@ -21,7 +21,9 @@ use clap::Parser;
 use cli::{Commands, Get, Options};
 use config::Config;
 use engine::generator;
-use get::{get_base_config, get_default_config, get_example_config};
+use get::{
+    get_base_config, get_default_config, get_example_config, get_lua_api, get_lua_func_opts,
+};
 use home::home_dir;
 use load::load;
 use lua::run_script;
@@ -144,6 +146,8 @@ async fn main() -> Result<(), anyhow::Error> {
             Get::DefaultConfig(o) => get_default_config(o)?,
             Get::ExampleConfig(o) => get_example_config(o)?,
             Get::BaseConfig(o) => get_base_config(o)?,
+            Get::LuaApi => get_lua_api(),
+            Get::LuaFuncOpts(o) => get_lua_func_opts(o),
         },
     }
 
