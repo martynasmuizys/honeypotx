@@ -130,13 +130,6 @@ impl Display for Config {
                 .as_str()
                 .green()
                 .bold(),
-            "Blacklist".on_black().white(),
-            self.init
-                .as_ref()
-                .unwrap()
-                .blacklist
-                .as_ref()
-                .unwrap_or(&Blacklist::default()),
             "Whitelist".on_white().black(),
             self.init
                 .as_ref()
@@ -144,6 +137,13 @@ impl Display for Config {
                 .whitelist
                 .as_ref()
                 .unwrap_or(&Whitelist::default()),
+            "Blacklist".on_black().white(),
+            self.init
+                .as_ref()
+                .unwrap()
+                .blacklist
+                .as_ref()
+                .unwrap_or(&Blacklist::default()),
             "Graylist".on_grey().black(),
             self.init
                 .as_ref()
@@ -213,7 +213,7 @@ impl Display for Graylist {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "        ├─ Enabled: {}\n        ├─ Max IPs: {}\n        ├─ Action: {}\n        └─ Frequency: {}\n",
+            "        ├─ Enabled: {}\n        ├─ Max IPs: {}\n        ├─ Action: {}\n        ├─ Frequency: {}\n        └─ Allowed Fast Packet Count: {}",
             self.enabled
                 .as_ref()
                 .unwrap_or(&false)
@@ -235,6 +235,12 @@ impl Display for Graylist {
             self.frequency
                 .as_ref()
                 .unwrap_or(&DEFAULT_FREQUENCY)
+                .to_string()
+                .green()
+                .bold(),
+            self.fast_packet_count
+                .as_ref()
+                .unwrap_or(&10)
                 .to_string()
                 .green()
                 .bold(),

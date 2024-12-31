@@ -108,7 +108,8 @@ pub fn analyze(_options: Analyze, config: Config) -> Result<bool, anyhow::Error>
                 "(not ok)".red().bold()
             );
             error_messages.push(anyhow!(
-                "Cannot check kernel flags without \"ripgrep\" package"
+                "Cannot check kernel flags without {} package",
+                "ripgrep".bold()
             ));
             total_errors += 1;
         }
@@ -207,7 +208,8 @@ pub fn analyze(_options: Analyze, config: Config) -> Result<bool, anyhow::Error>
                 "(not ok)".red().bold()
             );
             error_messages.push(anyhow!(
-                "Cannot check kernel flags without \"ripgrep\" package"
+                "Cannot check kernel flags without {} package",
+                "ripgrep".bold()
             ));
             total_errors += 1;
         }

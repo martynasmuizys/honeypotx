@@ -1,13 +1,19 @@
 use core::panic;
 use std::{
     fs::File,
-    io::{self, Write}, path::Path, process::Command,
+    io::{self, Write},
+    path::Path,
+    process::Command,
 };
 
 use anyhow::{anyhow, Context};
+use crossterm::style::Stylize;
 
 use crate::{
-    cli::Generate, config::{Config, Init, List, DEFAULT_FREQUENCY}, snippets::{ACTION, BASE_DNS, BASE_IP, GET_DATA_DNS, GET_DATA_IP, GRAYLIST, MAP}, WORKING_DIR
+    cli::Generate,
+    config::{Config, Init, List, DEFAULT_FREQUENCY},
+    snippets::{ACTION, BASE_DNS, BASE_IP, GET_DATA_DNS, GET_DATA_IP, GRAYLIST, MAP},
+    WORKING_DIR,
 };
 
 pub fn generator(_options: Generate, config: Config) -> Result<(bool, String), anyhow::Error> {
@@ -19,8 +25,22 @@ pub fn generator(_options: Generate, config: Config) -> Result<(bool, String), a
     );
     let path = Path::new(&out);
     let out_file = File::create(path)?;
+
+    println!(
+        "{}: Generating eBPF program...",
+        "Generate".yellow().bold(),
+    );
     generate(config, out_file)?;
-    Command::new("clang-format").arg("-i").arg(path).spawn()?;
+    println!(
+        "{}: Generated eBPF program at: {}",
+        "Generate".yellow().bold(),
+        path.display()
+    );
+
+    println!(
+        "{}: Compiling eBPF program...",
+        "Generate".yellow().bold(),
+    );
     Command::new("clang")
         .arg("-O2")
         .arg("-g")
@@ -31,6 +51,12 @@ pub fn generator(_options: Generate, config: Config) -> Result<(bool, String), a
         .arg("-o")
         .arg("/tmp/generated.o")
         .spawn()?;
+    println!(
+        "{}: Compiled eBPF program at: {}",
+        "Generate".yellow().bold(),
+        "/tmp/generated.o"
+    );
+
     Ok((true, out))
 }
 
@@ -354,10 +380,16 @@ fn replace_g_action(config: &Init, start: usize, end: usize, line: &str, list: &
     let mut parsed: Vec<String> = Vec::new();
     let action = match config.graylist.as_ref().unwrap().get_action() {
         "allow" | "deny" => {
-            return replace_wb_action("ip", config.graylist.as_ref().unwrap(), start, end, line, list);
-        },
-        _ => GRAYLIST
-
+            return replace_wb_action(
+                "ip",
+                config.graylist.as_ref().unwrap(),
+                start,
+                end,
+                line,
+                list,
+            );
+        }
+        _ => GRAYLIST,
     };
     let actions: &str = &(GET_DATA_IP.to_owned() + action);
 
