@@ -170,7 +170,7 @@ pub fn get_map_data(config: &Config, map_name: &str) -> Result<String, anyhow::E
         let password: String;
         unsafe {
             let pass = (*SSH_PASS.get()).lock().unwrap();
-            if pass.is_empty() {
+            if !pass.is_empty() {
                 password = (*pass).clone();
             } else {
                 password = rpassword::prompt_password("Password: ")?;

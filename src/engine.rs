@@ -11,7 +11,7 @@ use crossterm::style::Stylize;
 
 use crate::{
     cli::Generate,
-    config::{Config, Init, List, DEFAULT_FREQUENCY},
+    config::{Config, Init, List, DEFAULT_FAST_PACKETS, DEFAULT_FREQUENCY},
     snippets::{ACTION, BASE_DNS, BASE_IP, GET_DATA_DNS, GET_DATA_IP, GRAYLIST, MAP},
     WORKING_DIR,
 };
@@ -25,6 +25,24 @@ pub fn generator(_options: Generate, config: Config) -> Result<(bool, String), a
     );
     let path = Path::new(&out);
     let out_file = File::create(path)?;
+
+    println!("{}\n", "- CONFIG -".on_blue().black());
+    let mut action = String::new();
+
+    println!("{}", config);
+
+    print!(
+        "{}: Using config above. Proceed? [Y/n] ",
+        "Analyze".blue().bold()
+    );
+    io::stdout().flush()?;
+    io::stdin().read_line(&mut action)?;
+
+    let action = action.trim().to_lowercase();
+
+    if action != "y" && action != "yes" && !action.is_empty() {
+        return Err(anyhow!("Cancelled"));
+    }
 
     println!(
         "{}: Generating eBPF program...",
@@ -435,7 +453,7 @@ fn replace_g_action(config: &Init, start: usize, end: usize, line: &str, list: &
                                             .as_ref()
                                             .unwrap()
                                             .fast_packet_count
-                                            .unwrap_or(10)
+                                            .unwrap_or(DEFAULT_FAST_PACKETS)
                                             .to_string(),
                                     ),
                                 );

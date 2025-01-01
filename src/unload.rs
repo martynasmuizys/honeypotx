@@ -94,7 +94,7 @@ pub fn unload(options: &mut Unload, config: Config) -> Result<(), anyhow::Error>
         let password: String;
         unsafe {
             let pass = (*SSH_PASS.get()).lock().unwrap();
-            if pass.is_empty() {
+            if !pass.is_empty() {
                 password = (*pass).clone();
             } else {
                 password = rpassword::prompt_password("Password: ")?;
@@ -111,9 +111,6 @@ pub fn unload(options: &mut Unload, config: Config) -> Result<(), anyhow::Error>
             }
         }
 
-        session
-            .userauth_password(username.trim(), password.trim())
-            .unwrap();
         println!(
             "{}: Connected to {}\n",
             "Unload".red().bold(),

@@ -154,7 +154,7 @@ pub async fn load(options: &mut Load, config: Config) -> Result<usize, anyhow::E
         let password: String;
         unsafe {
             let pass = (*SSH_PASS.get()).lock().unwrap();
-            if pass.is_empty() {
+            if !pass.is_empty() {
                 password = (*pass).clone();
             } else {
                 password = rpassword::prompt_password("Password: ")?;

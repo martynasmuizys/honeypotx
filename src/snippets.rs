@@ -41,6 +41,7 @@ int {{name}}(struct xdp_md *ctx) {
 
     // Extract source IP address
     __u32 src_ip = ip->saddr;
+    bpf_printk(\"packet\");
 
     {{whitelist_action}}
 
@@ -141,13 +142,20 @@ pub static GRAYLIST: &str = "if ({{list}}_data) {
         __sync_fetch_and_add(&{{list}}_data->fast_packets, 1);
 
         if ({{list}}_data->fast_packets > {{fast_packet_count}}) {
-            struct Data new = {src_ip, {{list}}_data->rx_packets, bpf_ktime_get_ns()};
+            struct Data new = {src_ip, {{list}}_data->rx_packets, {{list}}_data->fast_packets, bpf_ktime_get_ns()};
             bpf_map_update_elem(&blacklist, &src_ip, &new, BPF_NOEXIST);
             return XDP_DROP;
         }
     } else {
-        struct Data new = {src_ip, {{list}}_data->rx_packets, bpf_ktime_get_ns()};
-        bpf_map_update_elem(&{{list}}, &src_ip, &new, BPF_NOEXIST);
+    bpf_printk(\"packet reset\");
+
+        struct Data new;
+        if ({{list}}_data->fast_packets >= 5) {
+            new = (struct Data){src_ip, {{list}}_data->rx_packets, {{list}}_data->fast_packets - 5, bpf_ktime_get_ns()};
+        } else {
+            new = (struct Data){src_ip, {{list}}_data->rx_packets, 0, bpf_ktime_get_ns()};
+        }
+        bpf_map_update_elem(&{{list}}, &src_ip, &new, BPF_EXIST);
     }
     #endif
     __sync_fetch_and_add(&{{list}}_data->rx_packets, 1);

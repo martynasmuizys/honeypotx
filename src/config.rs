@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 pub static DEFAULT_NET_IFACE: &str = "eth0";
 pub static DEFAULT_FREQUENCY: u32 = 1000;
+pub static DEFAULT_FAST_PACKETS: u32 = 100;
 
 static DEFAULT_NAME: &str = "ExampleProgram";
 static DEFAULT_MAX_IPS: u32 = 32;
@@ -240,7 +241,7 @@ impl Display for Graylist {
                 .bold(),
             self.fast_packet_count
                 .as_ref()
-                .unwrap_or(&10)
+                .unwrap_or(&DEFAULT_FAST_PACKETS)
                 .to_string()
                 .green()
                 .bold(),
@@ -291,7 +292,7 @@ impl Default for Graylist {
             max: Some(DEFAULT_MAX_IPS),
             action: Some(DEFAULT_GRAYLIST_ACTION.to_string()),
             frequency: Some(DEFAULT_FREQUENCY),
-            fast_packet_count: Some(10)
+            fast_packet_count: Some(DEFAULT_FAST_PACKETS)
         }
     }
 }

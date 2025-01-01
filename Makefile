@@ -1,21 +1,9 @@
-all: build run
+docker: docker-clean docker-build
 
-all_docker: build run_docker
-
-docker_clean:
+docker-clean:
 	docker container rm hpx
 	docker image rm hpx
 
-docker_build:
+docker-build:
 	docker buildx build -t hpx .
 	docker run --privileged -it --name hpx hpx:latest
-
-build:
-	clang -O2 -g -target bpf -c src/bpf/generated.c -o src/bpf/generated.o
-	cargo build
-
-run_docker:
-	cargo run
-
-run:
-	cargo run
