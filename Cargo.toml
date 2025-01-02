@@ -15,7 +15,7 @@ rodio = { version = "0.20.1", optional = true }
 rpassword = "7.3.1"
 serde = { version = "1.0.210", features = ["derive"] }
 serde_json = { version = "1.0.133", features = ["preserve_order"] }
-ssh2 = "0.9.4"
+ssh2 = { version = "0.9.4", features = ["vendored-openssl"]}
 sudo = "0.6.0"
 tokio = { version = "1.40.0", features = ["full"] }
 toml = "0.8.19"
