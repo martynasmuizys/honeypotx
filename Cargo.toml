@@ -19,3 +19,6 @@ ssh2 = "0.9.4"
 sudo = "0.6.0"
 tokio = { version = "1.40.0", features = ["full"] }
 toml = "0.8.19"
+
+[features]
+secret-audio = []
