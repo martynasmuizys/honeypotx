@@ -3,9 +3,6 @@ use std::{
     sync::Arc,
 };
 
-use rodio::{Decoder, OutputStream, Source};
-use tokio::signal;
-
 pub static GOSLING: &str = "              ░░██████████████████████████████████████████████████████████████████████░░
             ░░██████████████████████████▓▓████▓▓▓▓██████████████████████████████████████
             ░░██▓▓██████▓▓▓▓▒▒▒▒▒▒▓▓▓▓▓▓▓▓▒▒▒▒▒▒██▓▓██▓▓▓▓██████████████████████████████░░
@@ -78,6 +75,8 @@ pub async fn secret() -> Result<(), anyhow::Error> {
 
     #[allow(unexpected_cfgs)]
     if cfg!(audio_available = "true") {
+        use rodio::{Decoder, OutputStream, Source};
+        use tokio::signal;
         let (_stream, stream_handle) = OutputStream::try_default()?;
         let song = include_bytes!("../audio/let_it_happen.mp3").to_vec();
         let source = Decoder::new(Cursor::new(Arc::from(song.as_ref())))?;
