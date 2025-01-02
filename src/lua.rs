@@ -33,7 +33,7 @@ pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Resu
         let lua = Lua::new();
 
         let analyze_func = lua.create_function(|lua, opts: mlua::Table| -> mlua::Result<bool> {
-            let cfg: mlua::Table = opts.get("config")?;
+            let cfg: mlua::Table = opts.get(1)?;
             if std::env::var("HPX_ANALYZED").unwrap_or("0".to_string()) == "1" {
                 return Ok(true);
             }
@@ -51,7 +51,7 @@ pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Resu
 
         let generate_func =
             lua.create_function(|lua, opts: mlua::Table| -> mlua::Result<(bool, String)> {
-                let cfg: mlua::Table = opts.get("config")?;
+                let cfg: mlua::Table = opts.get(1)?;
                 if std::env::var("HPX_GENERATED").unwrap_or("0".to_string()) == "1" {
                     return Ok((false, "".to_string()));
                 }
@@ -69,9 +69,9 @@ pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Resu
             })?;
 
         let load_func = lua.create_async_function(|lua, opts: mlua::Table| async move {
-            let cfg: mlua::Table = opts.get("config")?;
-            let iface: mlua::String = opts.get("iface")?;
-            let xdp_flags: mlua::String = opts.get("xdp_flags")?;
+            let cfg: mlua::Table = opts.get(1)?;
+            let iface: mlua::String = opts.get(2)?;
+            let xdp_flags: mlua::String = opts.get(3)?;
 
             let val = cfg.serialize(mlua::serde::Serializer::new(&lua))?;
             let json_data = serde_json::to_string(&val).map_err(mlua::Error::external)?;
@@ -95,10 +95,10 @@ pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Resu
         })?;
 
         let unload_func = lua.create_function(|lua, opts: mlua::Table| {
-            let cfg: mlua::Table = opts.get("config")?;
-            let iface: mlua::String = opts.get("iface")?;
-            let xdp_flags: mlua::String = opts.get("xdp_flags")?;
-            let prog_id: mlua::Integer = opts.get("prog_id")?;
+            let cfg: mlua::Table = opts.get(1)?;
+            let iface: mlua::String = opts.get(2)?;
+            let xdp_flags: mlua::String = opts.get(3)?;
+            let prog_id: mlua::Integer = opts.get(4)?;
 
             let val = cfg.serialize(mlua::serde::Serializer::new(lua))?;
             let json_data = serde_json::to_string(&val).map_err(mlua::Error::external)?;
@@ -122,8 +122,8 @@ pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Resu
         })?;
 
         let get_map_data_func = lua.create_function(|lua, opts: mlua::Table| {
-            let cfg: mlua::Table = opts.get("config")?;
-            let map_name: mlua::String = opts.get("iface")?;
+            let cfg: mlua::Table = opts.get(1)?;
+            let map_name: mlua::String = opts.get(2)?;
 
             let val = cfg.serialize(mlua::serde::Serializer::new(lua))?;
             let json_data = serde_json::to_string(&val).map_err(mlua::Error::external)?;

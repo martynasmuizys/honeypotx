@@ -23,25 +23,17 @@ local config = {
 -- analyze(config)
 --
 
-local handle = io.popen("ls /tmp/generated.o 2> /dev/null")
-local result
-if handle ~= nil then
-    result = handle:read("*a")
+local done, out = generate({config})
+if done then
+    print("──────────────────────────")
+    print("eBPF program generated at:", out)
+    print("──────────────────────────\n")
 end
 
-if result == "" then
-    local done, out = generate(config)
-    if done then
-        print("──────────────────────────")
-        print("eBPF program generated at:", out)
-        print("──────────────────────────\n")
-    end
-end
-
-
-local id = pload(config, "lo", "generic")
+local opts = {config, "lo", "generic"};
+local id = pload(opts)
 print("Program id:", id)
-local data = get_map_data(config, "blacklist")
+local data = get_map_data({config, "blacklist"})
 local last_ip = ""
 for k, v in pairs(data[#data]["key"]) do
     if k == #data[#data]["key"] then
@@ -51,4 +43,4 @@ for k, v in pairs(data[#data]["key"]) do
     end
 end
 print("Random banned IP:", last_ip)
-punload(config, "lo", "generic", id)
+punload({config, "lo", "generic", id})
