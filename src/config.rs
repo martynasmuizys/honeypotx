@@ -288,7 +288,7 @@ impl Default for Blacklist {
 impl Default for Graylist {
     fn default() -> Self {
         Self {
-            enabled: Some(false),
+            enabled: Some(true),
             max: Some(DEFAULT_MAX_IPS),
             action: Some(DEFAULT_GRAYLIST_ACTION.to_string()),
             frequency: Some(DEFAULT_FREQUENCY),

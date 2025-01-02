@@ -137,27 +137,22 @@ pub static ACTION: &str = "if ({{list}}_data) {
 /// Investigate action (for graylist)
 pub static GRAYLIST: &str = "if ({{list}}_data) {
     __u64 time = (__u64){{frequency}} * MS_IN_NS;
-    #ifdef blacklistmap
     if (bpf_ktime_get_ns() - {{list}}_data->last_access_ns < time) {
         __sync_fetch_and_add(&{{list}}_data->fast_packets, 1);
 
+    #ifdef blacklistmap
         if ({{list}}_data->fast_packets > {{fast_packet_count}}) {
             struct Data new = {src_ip, {{list}}_data->rx_packets, {{list}}_data->fast_packets, bpf_ktime_get_ns()};
             bpf_map_update_elem(&blacklist, &src_ip, &new, BPF_NOEXIST);
             return XDP_DROP;
         }
-    } else {
-    bpf_printk(\"packet reset\");
-
-        struct Data new;
-        if ({{list}}_data->fast_packets >= 5) {
-            new = (struct Data){src_ip, {{list}}_data->rx_packets, {{list}}_data->fast_packets - 5, bpf_ktime_get_ns()};
-        } else {
-            new = (struct Data){src_ip, {{list}}_data->rx_packets, 0, bpf_ktime_get_ns()};
-        }
-        bpf_map_update_elem(&{{list}}, &src_ip, &new, BPF_EXIST);
-    }
     #endif
+    } else if (bpf_ktime_get_ns() - {{list}}_data->last_access_ns > time * 100) {
+        #ifdef blacklistmap
+        struct Data new = (struct Data){src_ip, {{list}}_data->rx_packets, 0, bpf_ktime_get_ns()};
+        bpf_map_update_elem(&{{list}}, &src_ip, &new, BPF_EXIST);
+        #endif
+    }
     __sync_fetch_and_add(&{{list}}_data->rx_packets, 1);
     __sync_fetch_and_add(&{{list}}_data->last_access_ns, bpf_ktime_get_ns() - {{list}}_data->last_access_ns);
 } else {
