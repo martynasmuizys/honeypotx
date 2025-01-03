@@ -20,8 +20,7 @@ local config = {
     }
 }
 
--- analyze(config)
---
+analyze({config})
 
 local done, out = generate({config})
 if done then

@@ -405,17 +405,17 @@ fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::Error>
                     "Analyze".blue().bold(),
                     "(not ok)".red().bold(),
                 );
+                unsafe {
+                    let pkgs = MISSING_PACKAGES.get().as_mut().unwrap();
+                    pkgs.lock().unwrap().append(&mut missing_pgks.clone());
+                }
+
+                return Err(anyhow!(format!(
+                    "Missing packages:\n - {}",
+                    missing_pgks.join("\n - ")
+                )));
             }
 
-            unsafe {
-                let pkgs = MISSING_PACKAGES.get().as_mut().unwrap();
-                pkgs.lock().unwrap().append(&mut missing_pgks.clone());
-            }
-
-            return Err(anyhow!(format!(
-                "Missing packages:\n - {}",
-                missing_pgks.join("\n - ")
-            )));
         }
         match nodename {
             "ubuntu" => {
