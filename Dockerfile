@@ -5,7 +5,8 @@ COPY . .
 RUN mkdir -p $HOME/.hpx/out
 
 RUN pacman -Syu --noconfirm
-RUN pacman -S clang neovim rustup alsa-utils lua bpf --noconfirm
+# alsa should not be needed anymore
+RUN pacman -S clang neovim rustup alsa-utils lua bpf netcat --noconfirm
 RUN rustup default stable
 RUN bpftool btf dump file /sys/kernel/btf/vmlinux format c > $HOME/.hpx/out/vmlinux.h
 RUN cargo run -- generate -c config/hpx_docker.json

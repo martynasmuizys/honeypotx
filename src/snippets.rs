@@ -35,7 +35,7 @@ int {{name}}(struct xdp_md *ctx) {
     if (data + sizeof(struct ethhdr) + sizeof(struct iphdr) > data_end)
         return XDP_PASS;
 
-    if(ip->protocol != IPPROTO_TCP) {
+    if((ip->protocol != IPPROTO_TCP) || (ip->protocol != IPPROTO_UDP)) {
         return XDP_PASS;
     }
 
@@ -141,7 +141,7 @@ pub static GRAYLIST: &str = "if ({{list}}_data) {
         __sync_fetch_and_add(&{{list}}_data->fast_packets, 1);
 
     #ifdef blacklistmap
-        if ({{list}}_data->fast_packets > {{fast_packet_count}}) {
+        if ({{list}}_data->fast_packets >= {{fast_packet_count}}) {
             struct Data new = {src_ip, {{list}}_data->rx_packets, {{list}}_data->fast_packets, bpf_ktime_get_ns()};
             bpf_map_update_elem(&blacklist, &src_ip, &new, BPF_NOEXIST);
             return XDP_DROP;

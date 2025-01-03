@@ -40,10 +40,18 @@ pub struct Run {
 }
 
 #[derive(Args, Debug)]
-pub struct Analyze {}
+pub struct Analyze {
+    /// Skip confirmation of the configuration, package installation.
+    #[arg(long, default_missing_value = "", num_args = 0)]
+    pub noconfirm: Option<String>,
+}
 
 #[derive(Args, Debug)]
-pub struct Generate {}
+pub struct Generate {
+    /// Skip confirmation of the configuration
+    #[arg(long, default_missing_value = "", num_args = 0)]
+    pub noconfirm: Option<String>,
+}
 
 #[derive(Args, Debug)]
 pub struct Load {

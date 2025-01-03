@@ -40,7 +40,7 @@ pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Resu
             let val = cfg.serialize(mlua::serde::Serializer::new(lua))?;
             let json_data = serde_json::to_string(&val).map_err(mlua::Error::external)?;
             let config: Config = serde_json::from_str(&json_data).map_err(mlua::Error::external)?;
-            match analyze(Analyze {}, config) {
+            match analyze(Analyze {noconfirm: Some("".to_string())}, config) {
                 Ok(ret) => {
                     std::env::set_var("HPX_ANALYZED", "1");
                     Ok(ret)
@@ -59,7 +59,7 @@ pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Resu
                 let json_data = serde_json::to_string(&val).map_err(mlua::Error::external)?;
                 let config: Config =
                     serde_json::from_str(&json_data).map_err(mlua::Error::external)?;
-                match generator(Generate {}, config) {
+                match generator(Generate {noconfirm: Some("".to_string())}, config) {
                     Ok(ret) => {
                         std::env::set_var("HPX_GENERATED", "1");
                         Ok(ret)

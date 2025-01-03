@@ -56,6 +56,20 @@ pub async fn load(options: &mut Load, config: Config) -> Result<usize, anyhow::E
     let port = config.init.as_ref().unwrap().port.as_ref();
     let path = "/tmp/generated.o";
 
+    if hostname.is_none()
+        || *hostname.as_ref().unwrap() == "localhost"
+        || *hostname.as_ref().unwrap() == "127.0.0.1"
+    {
+        match sudo::check() {
+            sudo::RunningAs::Root => (),
+            sudo::RunningAs::User => {
+                println!("{}: Requesting sudo privileges", "Load".red().bold());
+                let _ = sudo::with_env(&["HOME"]);
+            }
+            sudo::RunningAs::Suid => todo!(),
+        }
+    }
+
     let config_iface = config.init.as_ref().unwrap().iface.as_ref();
 
     if config_iface.is_some()
@@ -94,15 +108,6 @@ pub async fn load(options: &mut Load, config: Config) -> Result<usize, anyhow::E
         || *hostname.as_ref().unwrap() == "localhost"
         || *hostname.as_ref().unwrap() == "127.0.0.1"
     {
-        match sudo::check() {
-            sudo::RunningAs::Root => (),
-            sudo::RunningAs::User => {
-                println!("{}: Requesting sudo privileges", "Load".red().bold());
-                let _ = sudo::with_env(&["HOME"]);
-            }
-            sudo::RunningAs::Suid => todo!(),
-        }
-
         let mut action = String::new();
 
         print!(

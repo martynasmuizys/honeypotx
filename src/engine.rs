@@ -16,7 +16,7 @@ use crate::{
     WORKING_DIR,
 };
 
-pub fn generator(_options: Generate, config: Config) -> Result<(bool, String), anyhow::Error> {
+pub fn generator(options: Generate, config: Config) -> Result<(bool, String), anyhow::Error> {
     let out = format!(
         "{}/out/generated.c",
         WORKING_DIR
@@ -26,28 +26,27 @@ pub fn generator(_options: Generate, config: Config) -> Result<(bool, String), a
     let path = Path::new(&out);
     let out_file = File::create(path)?;
 
-    println!("{}\n", "- CONFIG -".on_blue().black());
-    let mut action = String::new();
+    if options.noconfirm.is_none() {
+        println!("{}\n", "- CONFIG -".on_blue().black());
+        let mut action = String::new();
 
-    println!("{}", config);
+        println!("{}", config);
 
-    print!(
-        "{}: Using config above. Proceed? [Y/n] ",
-        "Analyze".blue().bold()
-    );
-    io::stdout().flush()?;
-    io::stdin().read_line(&mut action)?;
+        print!(
+            "{}: Using config above. Proceed? [Y/n] ",
+            "Analyze".blue().bold()
+        );
+        io::stdout().flush()?;
+        io::stdin().read_line(&mut action)?;
 
-    let action = action.trim().to_lowercase();
+        let action = action.trim().to_lowercase();
 
-    if action != "y" && action != "yes" && !action.is_empty() {
-        return Err(anyhow!("Cancelled"));
+        if action != "y" && action != "yes" && !action.is_empty() {
+            return Err(anyhow!("Cancelled"));
+        }
     }
 
-    println!(
-        "{}: Generating eBPF program...",
-        "Generate".yellow().bold(),
-    );
+    println!("{}: Generating eBPF program...", "Generate".yellow().bold(),);
     generate(config, out_file)?;
     println!(
         "{}: Generated eBPF program at: {}",
@@ -55,10 +54,7 @@ pub fn generator(_options: Generate, config: Config) -> Result<(bool, String), a
         path.display()
     );
 
-    println!(
-        "{}: Compiling eBPF program...",
-        "Generate".yellow().bold(),
-    );
+    println!("{}: Compiling eBPF program...", "Generate".yellow().bold(),);
     Command::new("clang")
         .arg("-O2")
         .arg("-g")

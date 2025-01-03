@@ -23,27 +23,29 @@ static ARCH_PACKAGES: [&str; 4] = ["bpf", "base", "base-devel", "ripgrep"];
 static MISSING_PACKAGES: SyncUnsafeCell<Mutex<Vec<&str>>> =
     SyncUnsafeCell::new(Mutex::new(Vec::new()));
 
-pub fn analyze(_options: Analyze, config: Config) -> Result<bool, anyhow::Error> {
+pub fn analyze(options: Analyze, config: Config) -> Result<bool, anyhow::Error> {
     let mut total_errors = 0;
     let mut error_messages: Vec<anyhow::Error> = Vec::new();
     let mut skip_flag_check = false;
 
-    println!("{}\n", "- CONFIG -".on_blue().black());
-    let mut action = String::new();
+    if options.noconfirm.is_none() {
+        println!("{}\n", "- CONFIG -".on_blue().black());
+        let mut action = String::new();
 
-    println!("{}", config);
+        println!("{}", config);
 
-    print!(
-        "{}: Using config above. Proceed? [Y/n] ",
-        "Analyze".blue().bold()
-    );
-    io::stdout().flush()?;
-    io::stdin().read_line(&mut action)?;
+        print!(
+            "{}: Using config above. Proceed? [Y/n] ",
+            "Analyze".blue().bold()
+        );
+        io::stdout().flush()?;
+        io::stdin().read_line(&mut action)?;
 
-    let action = action.trim().to_lowercase();
+        let action = action.trim().to_lowercase();
 
-    if action != "y" && action != "yes" && !action.is_empty() {
-        return Err(anyhow!("Cancelled"));
+        if action != "y" && action != "yes" && !action.is_empty() {
+            return Err(anyhow!("Cancelled"));
+        }
     }
 
     let hostname = config.init.as_ref().unwrap().hostname.as_ref();
@@ -72,7 +74,7 @@ pub fn analyze(_options: Analyze, config: Config) -> Result<bool, anyhow::Error>
         println!("{}", "- Required Packages Check -".on_blue().black());
         output = String::from_utf8(Command::new("uname").arg("-n").output().unwrap().stdout)?;
 
-        match check_packages(output.trim()) {
+        match check_packages(options, output.trim()) {
             Ok(_) => (),
             Err(e) => {
                 unsafe {
@@ -180,7 +182,7 @@ pub fn analyze(_options: Analyze, config: Config) -> Result<bool, anyhow::Error>
         };
 
         println!("{}", "- Required Packages Check -".on_blue().black());
-        match check_packages_remote(&mut session, &password) {
+        match check_packages_remote(options, &mut session, &password) {
             Ok(_) => (),
             Err(e) => {
                 unsafe {
@@ -327,7 +329,7 @@ fn check_kernel_version_remote(session: &mut Session) -> Result<(), anyhow::Erro
     Ok(())
 }
 
-fn check_packages(nodename: &str) -> Result<(), anyhow::Error> {
+fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::Error> {
     let mut missing_pgks: Vec<&str> = Vec::new();
     let mut output = String::new();
 
@@ -383,31 +385,35 @@ fn check_packages(nodename: &str) -> Result<(), anyhow::Error> {
     }
 
     if !missing_pgks.is_empty() {
-        let mut action = String::new();
-        println!(
-            "{}: Missing packages:\n - {}",
-            "Analyze".blue(),
-            missing_pgks.join("\n - ")
-        );
-        print!(
-            "{}: Attempt to install missing packages? [Y/n] ",
-            "Analyze".blue().bold()
-        );
-        io::stdout().flush()?;
-        io::stdin().read_line(&mut action)?;
-
-        let action = action.trim().to_lowercase();
-
-        if action != "y" && action != "yes" && !action.is_empty() {
+        if options.noconfirm.is_none() {
+            let mut action = String::new();
             println!(
-                "{}: Required packages {}\n",
-                "Analyze".blue().bold(),
-                "(not ok)".red().bold(),
+                "{}: Missing packages:\n - {}",
+                "Analyze".blue(),
+                missing_pgks.join("\n - ")
             );
+            print!(
+                "{}: Attempt to install missing packages? [Y/n] ",
+                "Analyze".blue().bold()
+            );
+            io::stdout().flush()?;
+            io::stdin().read_line(&mut action)?;
+
+            let action = action.trim().to_lowercase();
+
+            if action != "y" && action != "yes" && !action.is_empty() {
+                println!(
+                    "{}: Required packages {}\n",
+                    "Analyze".blue().bold(),
+                    "(not ok)".red().bold(),
+                );
+            }
+
             unsafe {
                 let pkgs = MISSING_PACKAGES.get().as_mut().unwrap();
                 pkgs.lock().unwrap().append(&mut missing_pgks.clone());
             }
+
             return Err(anyhow!(format!(
                 "Missing packages:\n - {}",
                 missing_pgks.join("\n - ")
@@ -446,7 +452,11 @@ fn check_packages(nodename: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn check_packages_remote(session: &mut Session, password: &str) -> Result<(), anyhow::Error> {
+fn check_packages_remote(
+    options: Analyze,
+    session: &mut Session,
+    password: &str,
+) -> Result<(), anyhow::Error> {
     let mut channel = session.channel_session().unwrap();
     channel.exec("uname -n").unwrap();
     let mut output = String::new();
@@ -502,31 +512,34 @@ fn check_packages_remote(session: &mut Session, password: &str) -> Result<(), an
     }
 
     if !missing_pgks.is_empty() {
-        let mut action = String::new();
-        println!(
-            "{}: Missing packages:\n - {}",
-            "Analyze".blue(),
-            missing_pgks.join("\n - ")
-        );
-        print!(
-            "{}: Attempt to install missing packages? [Y/n] ",
-            "Analyze".blue().bold()
-        );
-        io::stdout().flush()?;
-        io::stdin().read_line(&mut action)?;
-
-        let action = action.trim().to_lowercase();
-
-        if action != "y" && action != "yes" && !action.is_empty() {
-            unsafe {
-                let pkgs = MISSING_PACKAGES.get().as_mut().unwrap();
-                pkgs.lock().unwrap().append(&mut missing_pgks.clone());
-            }
-            return Err(anyhow!(format!(
-                "Missing packages:\n - {}",
+        if options.noconfirm.is_none() {
+            let mut action = String::new();
+            println!(
+                "{}: Missing packages:\n - {}",
+                "Analyze".blue(),
                 missing_pgks.join("\n - ")
-            )));
+            );
+            print!(
+                "{}: Attempt to install missing packages? [Y/n] ",
+                "Analyze".blue().bold()
+            );
+            io::stdout().flush()?;
+            io::stdin().read_line(&mut action)?;
+
+            let action = action.trim().to_lowercase();
+
+            if action != "y" && action != "yes" && !action.is_empty() {
+                unsafe {
+                    let pkgs = MISSING_PACKAGES.get().as_mut().unwrap();
+                    pkgs.lock().unwrap().append(&mut missing_pgks.clone());
+                }
+                return Err(anyhow!(format!(
+                    "Missing packages:\n - {}",
+                    missing_pgks.join("\n - ")
+                )));
+            }
         }
+
         match nodename.as_str() {
             "ubuntu" => {
                 output = String::new();

@@ -20,6 +20,7 @@ use anyhow::{anyhow, Context};
 use clap::Parser;
 use cli::{Commands, Get, Options};
 use config::Config;
+use crossterm::style::Stylize;
 use engine::generator;
 use get::{
     get_base_config, get_default_config, get_example_config, get_lua_api, get_lua_func_opts,
@@ -125,7 +126,11 @@ async fn main() -> Result<(), anyhow::Error> {
             analyze(options, config)?;
         }
         Commands::Load(mut options) => {
-            load(&mut options, config).await?;
+            let prog_id = load(&mut options, config).await?;
+
+            if prog_id != 0 {
+                print!("{}: Program ID - {prog_id}", "Load".red().bold());
+            }
         }
         Commands::Unload(mut options) => unload(&mut options, config)?,
         Commands::Secret => secret::secret().await?,
