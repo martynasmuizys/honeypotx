@@ -112,7 +112,7 @@ local config = {
 
 analyze(config)
 
-local handle = io.popen("ls /tmp/generated.o 2> /dev/null")
+local handle = io.popen("ls /home/martis/.hpx/out/generated.o 2> /dev/null")
 local result
 if handle ~= nil then
     result = handle:read("*a")

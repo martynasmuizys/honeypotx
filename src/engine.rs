@@ -54,6 +54,13 @@ pub fn generator(options: Generate, config: Config) -> Result<(bool, String), an
         path.display()
     );
 
+    let out = format!(
+        "{}/out/generated.o",
+        WORKING_DIR
+            .to_str()
+            .with_context(|| "Failed to parse HOME directory".to_string())?
+    );
+    let compile_out = Path::new(&out);
     println!("{}: Compiling eBPF program...", "Generate".yellow().bold(),);
     Command::new("clang")
         .arg("-O2")
@@ -63,12 +70,12 @@ pub fn generator(options: Generate, config: Config) -> Result<(bool, String), an
         .arg("-c")
         .arg(path)
         .arg("-o")
-        .arg("/tmp/generated.o")
+        .arg(compile_out)
         .spawn()?;
     println!(
         "{}: Compiled eBPF program at: {}",
         "Generate".yellow().bold(),
-        "/tmp/generated.o"
+        compile_out.display()
     );
 
     Ok((true, out))

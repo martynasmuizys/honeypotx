@@ -54,7 +54,12 @@ struct ProgData {
 pub async fn load(options: &mut Load, config: Config) -> Result<usize, anyhow::Error> {
     let hostname = config.init.as_ref().unwrap().hostname.as_ref();
     let port = config.init.as_ref().unwrap().port.as_ref();
-    let path = "/tmp/generated.o";
+    let path = format!(
+        "{}/out/generated.o",
+        WORKING_DIR
+            .to_str()
+            .with_context(|| "Failed to parse HOME directory".to_string())?
+    );
 
     if hostname.is_none()
         || *hostname.as_ref().unwrap() == "localhost"
@@ -121,10 +126,10 @@ pub async fn load(options: &mut Load, config: Config) -> Result<usize, anyhow::E
         let action = action.trim().to_lowercase();
 
         if action == "1" || action.is_empty() {
-            load_local_temp(options, config, path).await?;
+            load_local_temp(options, config, &path).await?;
             return Ok(0);
         } else if action == "2" {
-            return load_local(options, config, path);
+            return load_local(options, config, &path);
         }
 
         return Err(anyhow!("Cancelled"));
@@ -181,7 +186,7 @@ pub async fn load(options: &mut Load, config: Config) -> Result<usize, anyhow::E
             "Load".red().bold(),
             hostname.unwrap()
         );
-        send_file(&config, path, &session, &password)?;
+        send_file(&config, &path, &session, &password)?;
         return load_remote(options, config, &session, &password);
     }
     Ok(0)
