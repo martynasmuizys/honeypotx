@@ -338,7 +338,7 @@ fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::Error>
             for pkg in UBUNTU_PACKAGES {
                 output = String::from_utf8(
                     Command::new("sh")
-                        .args(["-c", format!("apt -qq list {}", pkg).as_str()])
+                        .args(["-c", format!("'apt -qq list {}'", pkg).as_str()])
                         .output()
                         .unwrap()
                         .stdout,
