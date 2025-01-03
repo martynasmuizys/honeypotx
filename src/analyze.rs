@@ -422,7 +422,7 @@ fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::Error>
                 Command::new("sh")
                     .args([
                         "-c",
-                        format!("apt install --assume-yes {}", missing_pgks.join(" ")).as_str(),
+                        format!("sudo apt install --assume-yes {}", missing_pgks.join(" ")).as_str(),
                     ])
                     .output()?;
             }
