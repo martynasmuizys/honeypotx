@@ -15,6 +15,12 @@ First make sure [Rust](https://github.com/rust-lang/rust) toolchain is installed
 ```bash
 cargo +nightly install --git https://github.com/martynasmuizys/hpx.git
 ```
+### Manually
+```bash
+git clone https://github.com/martynasmuizys/hpx.git
+cd hpx
+make install
+```
 
 ### Usage
 The binary is named `hpx`. You can run `hpx help` to list all possible commands.

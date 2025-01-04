@@ -7,3 +7,6 @@ docker-clean:
 docker-build:
 	docker buildx build -t hpx .
 	docker run --privileged -it --name hpx hpx:latest
+
+install:
+	cargo install --path .
