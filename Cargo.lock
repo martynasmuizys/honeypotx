@@ -506,6 +506,7 @@ dependencies = [
  "home",
  "libbpf-rs",
  "mlua",
+ "pkg-config",
  "pnet",
  "rodio",
  "rpassword",
