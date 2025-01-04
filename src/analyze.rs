@@ -12,12 +12,7 @@ use crate::cli::Analyze;
 use crate::config::Config;
 
 static MIN_KERNEL_VERSION: &str = "5.17.0";
-static UBUNTU_PACKAGES: [&str; 4] = [
-    "linux-tools-common",
-    "linux-tools-generic",
-    "linux-cloud-tools-generic",
-    "ripgrep",
-];
+static mut UBUNTU_PACKAGES: [&str; 3] = ["linux-tools-common", "linux-tools-generic", "ripgrep"];
 static ARCH_PACKAGES: [&str; 4] = ["bpf", "base", "base-devel", "ripgrep"];
 
 static MISSING_PACKAGES: SyncUnsafeCell<Mutex<Vec<&str>>> =
@@ -330,28 +325,30 @@ fn check_kernel_version_remote(session: &mut Session) -> Result<(), anyhow::Erro
 }
 
 fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::Error> {
-    let mut missing_pgks: Vec<&str> = Vec::new();
+    let mut missing_pkgs: Vec<&str> = Vec::new();
     let mut output = String::new();
 
     match nodename {
         "ubuntu" => {
-            for pkg in UBUNTU_PACKAGES {
-                output = String::from_utf8(
-                    Command::new("sh")
-                        .args(["-c", format!("'apt -qq list {}'", pkg).as_str()])
-                        .output()
-                        .unwrap()
+            unsafe {
+                for pkg in UBUNTU_PACKAGES {
+                    output = String::from_utf8(
+                        Command::new("sh")
+                            .args(["-c", format!("'apt -qq list {}'", pkg).as_str()])
+                            .output()
+                            .unwrap()
                         .stdout,
-                )?;
+                    )?;
 
-                if !output.contains("[installed]") {
-                    missing_pgks.push(pkg);
-                } else {
-                    println!(
-                        "{}: Package \"{}\" is installed.",
-                        "Analyze".blue().bold(),
-                        pkg.bold()
-                    );
+                    if !output.contains("[installed]") {
+                        missing_pkgs.push(pkg);
+                    } else {
+                        println!(
+                            "{}: Package \"{}\" is installed.",
+                            "Analyze".blue().bold(),
+                            pkg.bold()
+                        );
+                    }
                 }
             }
         }
@@ -369,7 +366,7 @@ fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::Error>
 
             for pkg in ARCH_PACKAGES {
                 if !output.contains(pkg) {
-                    missing_pgks.push(pkg);
+                    missing_pkgs.push(pkg);
                 } else {
                     println!(
                         "{}: Package \"{}\" is installed.",
@@ -382,13 +379,22 @@ fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::Error>
         _ => return Err(anyhow!("Unsupported OS: {}", output)),
     }
 
-    if !missing_pgks.is_empty() {
+    missing_pkgs.iter_mut().for_each(|pkg| {
+        if *pkg == "linux-tools-generic" {
+            let output =
+            String::from_utf8(Command::new("uname").arg("-r").output().unwrap().stdout).unwrap();
+            *pkg = ("linux-tools-".to_string() + output.leak()).leak();
+        }
+    });
+    dbg!(&missing_pkgs);
+
+    if !missing_pkgs.is_empty() {
         if options.noconfirm.is_none() {
             let mut action = String::new();
             println!(
                 "{}: Missing packages:\n - {}",
                 "Analyze".blue(),
-                missing_pgks.join("\n - ")
+                missing_pkgs.join("\n - ")
             );
             print!(
                 "{}: Attempt to install missing packages? [Y/n] ",
@@ -407,32 +413,37 @@ fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::Error>
                 );
                 unsafe {
                     let pkgs = MISSING_PACKAGES.get().as_mut().unwrap();
-                    pkgs.lock().unwrap().append(&mut missing_pgks.clone());
+                    pkgs.lock().unwrap().append(&mut missing_pkgs.clone());
                 }
 
                 return Err(anyhow!(format!(
                     "Missing packages:\n - {}",
-                    missing_pgks.join("\n - ")
+                    missing_pkgs.join("\n - ")
                 )));
             }
-
         }
         match nodename {
             "ubuntu" => {
                 Command::new("sh")
                     .args([
                         "-c",
-                        format!("sudo apt install --assume-yes {}", missing_pgks.join(" ")).as_str(),
+                        format!("sudo apt install --assume-yes {}", missing_pkgs.join(" "))
+                            .as_str(),
                     ])
                     .output()?;
             }
             "archlinux" => {
-                Command::new("sh")
-                    .args([
-                        "-c",
-                        format!("sudo pacman --noconfirm -S {}", missing_pgks.join(" ")).as_str(),
-                    ])
-                    .output()?;
+                //Command::new("sh")
+                //    .args([
+                //        "-c",
+                //        format!("sudo pacman --noconfirm -S {}", missing_pkgs.join(" ")).as_str(),
+                //    ])
+                //    .output()?;
+                //Command::new("pacman")
+                //    .arg(c"
+                //        format!("sudo pacman --noconfirm -S {}", missing_pkgs.join(" ")).as_str(),
+                //    ])
+                //    .output()?;
             }
             _ => return Err(anyhow!("Unsupported OS: {}", output)),
         }
@@ -459,31 +470,33 @@ fn check_packages_remote(
     channel.exec("uname -n").unwrap();
     let mut output = String::new();
     channel.read_to_string(&mut output).unwrap();
-    let mut missing_pgks: Vec<&str> = Vec::new();
+    let mut missing_pkgs: Vec<&str> = Vec::new();
 
     let nodename = output.clone().trim().to_string();
 
     match nodename.as_str() {
         "ubuntu" => {
-            for pkg in UBUNTU_PACKAGES {
-                output = String::new();
-                let mut channel = session.channel_session().unwrap();
-                channel
-                    .exec(format!("apt -qq list {}", pkg).as_str())
-                    .unwrap();
-                channel.read_to_string(&mut output).unwrap();
+            unsafe {
+                for pkg in UBUNTU_PACKAGES {
+                    output = String::new();
+                    let mut channel = session.channel_session().unwrap();
+                    channel
+                        .exec(format!("apt -qq list {}", pkg).as_str())
+                        .unwrap();
+                    channel.read_to_string(&mut output).unwrap();
 
-                if !output.contains("[installed]") {
-                    missing_pgks.push(pkg);
-                } else {
-                    println!(
-                        "{}: Package \"{}\" is installed.",
-                        "Analyze".blue().bold(),
-                        pkg.bold()
-                    );
+                    if !output.contains("[installed]") {
+                        missing_pkgs.push(pkg);
+                    } else {
+                        println!(
+                            "{}: Package \"{}\" is installed.",
+                            "Analyze".blue().bold(),
+                            pkg.bold()
+                        );
+                    }
+
+                    channel.wait_close()?;
                 }
-
-                channel.wait_close()?;
             }
         }
         "archlinux" => {
@@ -496,7 +509,7 @@ fn check_packages_remote(
 
             for pkg in ARCH_PACKAGES {
                 if !output.contains(pkg) {
-                    missing_pgks.push(pkg);
+                    missing_pkgs.push(pkg);
                 } else {
                     println!(
                         "{}: Package \"{}\" is installed.",
@@ -509,13 +522,13 @@ fn check_packages_remote(
         _ => return Err(anyhow!("Unsupported OS: {}", output)),
     }
 
-    if !missing_pgks.is_empty() {
+    if !missing_pkgs.is_empty() {
         if options.noconfirm.is_none() {
             let mut action = String::new();
             println!(
                 "{}: Missing packages:\n - {}",
                 "Analyze".blue(),
-                missing_pgks.join("\n - ")
+                missing_pkgs.join("\n - ")
             );
             print!(
                 "{}: Attempt to install missing packages? [Y/n] ",
@@ -529,11 +542,11 @@ fn check_packages_remote(
             if action != "y" && action != "yes" && !action.is_empty() {
                 unsafe {
                     let pkgs = MISSING_PACKAGES.get().as_mut().unwrap();
-                    pkgs.lock().unwrap().append(&mut missing_pgks.clone());
+                    pkgs.lock().unwrap().append(&mut missing_pkgs.clone());
                 }
                 return Err(anyhow!(format!(
                     "Missing packages:\n - {}",
-                    missing_pgks.join("\n - ")
+                    missing_pkgs.join("\n - ")
                 )));
             }
         }
@@ -547,7 +560,7 @@ fn check_packages_remote(
                         format!(
                             "echo {} | sudo -S apt install --assume-yes {}",
                             password,
-                            missing_pgks.join(" ")
+                            missing_pkgs.join(" ")
                         )
                         .as_str(),
                     )
@@ -564,7 +577,7 @@ fn check_packages_remote(
                         format!(
                             "echo {} | sudo -S pacman --noconfirm -S {}",
                             password,
-                            missing_pgks.join(" ")
+                            missing_pkgs.join(" ")
                         )
                         .as_str(),
                     )
