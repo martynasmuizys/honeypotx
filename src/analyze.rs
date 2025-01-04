@@ -334,7 +334,7 @@ fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::Error>
                 for pkg in UBUNTU_PACKAGES {
                     output = String::from_utf8(
                         Command::new("sh")
-                            .args(["-c", format!("'apt -qq list {}'", pkg).as_str()])
+                            .args(["-c", format!("apt -qq list {}", pkg).as_str()])
                             .output()
                             .unwrap()
                         .stdout,
@@ -386,7 +386,6 @@ fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::Error>
             *pkg = ("linux-tools-".to_string() + output.leak()).leak().trim();
         }
     });
-    dbg!(&missing_pkgs);
 
     if !missing_pkgs.is_empty() {
         if options.noconfirm.is_none() {
