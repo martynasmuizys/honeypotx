@@ -329,29 +329,27 @@ fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::Error>
     let mut output = String::new();
 
     match nodename {
-        "ubuntu" => {
-            unsafe {
-                for pkg in UBUNTU_PACKAGES {
-                    output = String::from_utf8(
-                        Command::new("sh")
-                            .args(["-c", format!("apt -qq list {}", pkg).as_str()])
-                            .output()
-                            .unwrap()
+        "ubuntu" => unsafe {
+            for pkg in UBUNTU_PACKAGES {
+                output = String::from_utf8(
+                    Command::new("sh")
+                        .args(["-c", format!("apt -qq list {}", pkg).as_str()])
+                        .output()
+                        .unwrap()
                         .stdout,
-                    )?;
+                )?;
 
-                    if !output.contains("[installed]") {
-                        missing_pkgs.push(pkg);
-                    } else {
-                        println!(
-                            "{}: Package \"{}\" is installed.",
-                            "Analyze".blue().bold(),
-                            pkg.bold()
-                        );
-                    }
+                if !output.contains("[installed]") {
+                    missing_pkgs.push(pkg);
+                } else {
+                    println!(
+                        "{}: Package \"{}\" is installed.",
+                        "Analyze".blue().bold(),
+                        pkg.bold()
+                    );
                 }
             }
-        }
+        },
         "archlinux" => {
             output = String::from_utf8(
                 Command::new("sh")
@@ -382,7 +380,8 @@ fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::Error>
     missing_pkgs.iter_mut().for_each(|pkg| {
         if *pkg == "linux-tools-generic" {
             let output =
-            String::from_utf8(Command::new("uname").arg("-r").output().unwrap().stdout).unwrap();
+                String::from_utf8(Command::new("uname").arg("-r").output().unwrap().stdout)
+                    .unwrap();
             *pkg = ("linux-tools-".to_string() + output.leak()).leak().trim();
         }
     });
@@ -421,33 +420,33 @@ fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::Error>
                 )));
             }
         }
+
+        println!(
+            "{}: Installing missing packages:\n - {}\n",
+            "Analyze".blue().bold(),
+            missing_pkgs.join("\n - ")
+        );
         match nodename {
             "ubuntu" => {
-                Command::new("sh")
-                    .args([
-                        "-c",
-                        format!("sudo apt install --assume-yes {}", missing_pkgs.join(" "))
-                            .as_str(),
-                    ])
+                Command::new("sudo")
+                    .arg("apt")
+                    .arg("install")
+                    .arg("--assume-yes")
+                    .arg(missing_pkgs.join(" "))
                     .output()?;
             }
             "archlinux" => {
-                //Command::new("sh")
-                //    .args([
-                //        "-c",
-                //        format!("sudo pacman --noconfirm -S {}", missing_pkgs.join(" ")).as_str(),
-                //    ])
-                //    .output()?;
-                //Command::new("pacman")
-                //    .arg(c"
-                //        format!("sudo pacman --noconfirm -S {}", missing_pkgs.join(" ")).as_str(),
-                //    ])
-                //    .output()?;
+                Command::new("sudo")
+                    .arg("pacman")
+                    .arg("--noconfirm")
+                    .arg("-S")
+                    .arg(missing_pkgs.join(" "))
+                    .output()?;
             }
             _ => return Err(anyhow!("Unsupported OS: {}", output)),
         }
         println!(
-            "{}: Missing packages installed succefully.",
+            "{}: Missing packages installed succefully.\n",
             "Analyze".blue().bold()
         );
     } else {
@@ -474,30 +473,28 @@ fn check_packages_remote(
     let nodename = output.clone().trim().to_string();
 
     match nodename.as_str() {
-        "ubuntu" => {
-            unsafe {
-                for pkg in UBUNTU_PACKAGES {
-                    output = String::new();
-                    let mut channel = session.channel_session().unwrap();
-                    channel
-                        .exec(format!("apt -qq list {}", pkg).as_str())
-                        .unwrap();
-                    channel.read_to_string(&mut output).unwrap();
+        "ubuntu" => unsafe {
+            for pkg in UBUNTU_PACKAGES {
+                output = String::new();
+                let mut channel = session.channel_session().unwrap();
+                channel
+                    .exec(format!("apt -qq list {}", pkg).as_str())
+                    .unwrap();
+                channel.read_to_string(&mut output).unwrap();
 
-                    if !output.contains("[installed]") {
-                        missing_pkgs.push(pkg);
-                    } else {
-                        println!(
-                            "{}: Package \"{}\" is installed.",
-                            "Analyze".blue().bold(),
-                            pkg.bold()
-                        );
-                    }
-
-                    channel.wait_close()?;
+                if !output.contains("[installed]") {
+                    missing_pkgs.push(pkg);
+                } else {
+                    println!(
+                        "{}: Package \"{}\" is installed.",
+                        "Analyze".blue().bold(),
+                        pkg.bold()
+                    );
                 }
+
+                channel.wait_close()?;
             }
-        }
+        },
         "archlinux" => {
             let mut channel = session.channel_session().unwrap();
             channel
