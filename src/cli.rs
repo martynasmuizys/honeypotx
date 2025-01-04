@@ -1,4 +1,4 @@
-use clap::{Args, Parser, Subcommand};
+use clap::{arg, Args, Parser, Subcommand};
 
 // Main command options
 #[derive(Parser, Debug)]
@@ -86,7 +86,7 @@ pub enum Get {
     BaseConfig(ConfOutputType),
     /// Get available Lua API
     LuaApi,
-    #[command(subcommand)]
+    #[command(subcommand, subcommand_help_heading = "Functions", subcommand_value_name = "FUNCTION")]
     LuaFuncOpts(LuaFunc)
 }
 
