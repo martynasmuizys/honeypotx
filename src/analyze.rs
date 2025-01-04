@@ -383,7 +383,7 @@ fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::Error>
         if *pkg == "linux-tools-generic" {
             let output =
             String::from_utf8(Command::new("uname").arg("-r").output().unwrap().stdout).unwrap();
-            *pkg = ("linux-tools-".to_string() + output.leak()).leak();
+            *pkg = ("linux-tools-".to_string() + output.leak()).leak().trim();
         }
     });
     dbg!(&missing_pkgs);
