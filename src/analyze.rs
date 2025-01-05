@@ -18,7 +18,7 @@ static ARCH_PACKAGES: [&str; 4] = ["bpf", "base", "base-devel", "ripgrep"];
 static MISSING_PACKAGES: SyncUnsafeCell<Mutex<Vec<&str>>> =
     SyncUnsafeCell::new(Mutex::new(Vec::new()));
 
-pub fn analyze(options: Analyze, config: Config) -> Result<bool, anyhow::Error> {
+pub async fn analyze(options: Analyze, config: Config) -> Result<bool, anyhow::Error> {
     let mut total_errors = 0;
     let mut error_messages: Vec<anyhow::Error> = Vec::new();
     let mut skip_flag_check = false;
@@ -69,7 +69,7 @@ pub fn analyze(options: Analyze, config: Config) -> Result<bool, anyhow::Error> 
         println!("{}", "- Required Packages Check -".on_blue().black());
         output = String::from_utf8(Command::new("uname").arg("-n").output().unwrap().stdout)?;
 
-        match check_packages(options, output.trim()) {
+        match check_packages(options, output.trim()).await {
             Ok(_) => (),
             Err(e) => {
                 unsafe {
@@ -324,14 +324,14 @@ fn check_kernel_version_remote(session: &mut Session) -> Result<(), anyhow::Erro
     Ok(())
 }
 
-fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::Error> {
+async fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::Error> {
     let missing_pkgs: Arc<Mutex<Vec<&str>>> = Arc::new(Mutex::new(Vec::new()));
 
     match nodename {
         "ubuntu" => unsafe {
-            for pkg in UBUNTU_PACKAGES {
+            let tasks = UBUNTU_PACKAGES.map(|pkg| {
+
                 let missing_pkgs: Arc<Mutex<Vec<&str>>> = missing_pkgs.clone();
-                //let mut output = String::new();
                 tokio::spawn(async move {
                     let output = String::from_utf8(
                         tokio::process::Command::new("sh")
@@ -351,7 +351,10 @@ fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::Error>
                             pkg.bold()
                         );
                     }
-                });
+                })
+            });
+            for t in tasks {
+                t.await?
             }
         },
         "archlinux" => {

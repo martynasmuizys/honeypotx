@@ -123,7 +123,7 @@ async fn main() -> Result<(), anyhow::Error> {
             generator(options, config)?;
         }
         Commands::Analyze(options) => {
-            analyze(options, config)?;
+            analyze(options, config).await?;
         }
         Commands::Load(mut options) => {
             let prog_id = load(&mut options, config).await?;

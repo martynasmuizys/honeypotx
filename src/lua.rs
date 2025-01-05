@@ -32,15 +32,15 @@ pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Resu
     if path.exists() {
         let lua = Lua::new();
 
-        let analyze_func = lua.create_function(|lua, opts: mlua::Table| -> mlua::Result<bool> {
+        let analyze_func = lua.create_async_function(|lua, opts: mlua::Table| async move {
             let cfg: mlua::Table = opts.get(1)?;
             if std::env::var("HPX_ANALYZED").unwrap_or("0".to_string()) == "1" {
                 return Ok(true);
             }
-            let val = cfg.serialize(mlua::serde::Serializer::new(lua))?;
+            let val = cfg.serialize(mlua::serde::Serializer::new(&lua))?;
             let json_data = serde_json::to_string(&val).map_err(mlua::Error::external)?;
             let config: Config = serde_json::from_str(&json_data).map_err(mlua::Error::external)?;
-            match analyze(Analyze {noconfirm: Some("".to_string())}, config) {
+            match analyze(Analyze {noconfirm: Some("".to_string())}, config).await {
                 Ok(ret) => {
                     std::env::set_var("HPX_ANALYZED", "1");
                     Ok(ret)
