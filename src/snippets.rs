@@ -48,7 +48,7 @@ int {{name}}(struct xdp_md *ctx) {
 
     {{graylist_action}}
 
-    return XDP_PASS;
+    return {{default_action}};
 }
 
 
@@ -108,7 +108,7 @@ int {{name}}(struct xdp_md *ctx) {
     {{blacklist_action}}
 
 
-  return XDP_PASS;
+  return {{default_action}};
 }
 
 char __license[] SEC(\"license\") = \"GPL\";

@@ -11,7 +11,7 @@ use crossterm::style::Stylize;
 
 use crate::{
     cli::Generate,
-    config::{Config, Init, List, DEFAULT_FAST_PACKETS, DEFAULT_FREQUENCY},
+    config::{Config, Init, List, DEFAULT_FAST_PACKETS, DEFAULT_FREQUENCY, DEFAULT_NAME},
     snippets::{ACTION, BASE_DNS, BASE_IP, GET_DATA_DNS, GET_DATA_IP, GRAYLIST, MAP},
     WORKING_DIR,
 };
@@ -258,6 +258,7 @@ fn generate_program(config: Config, out: File, prog_base: &str) -> Result<(), an
                                 "graylist",
                             )
                         }
+                        "default_action" => replace_default_action(&config, start, end, line),
                         _ => {
                             writer.write_all((line.to_string() + "\n").as_bytes())?;
                             continue;
@@ -281,7 +282,7 @@ fn replace_name(config: &Config, start: usize, end: usize, line: &str) -> String
         .unwrap()
         .name
         .as_ref()
-        .unwrap()
+        .unwrap_or(&DEFAULT_NAME.to_string())
         .as_str()
         .replace(" ", "");
     line.replace(&line[start..end + 2], &name)
@@ -485,4 +486,29 @@ fn replace_g_action(config: &Init, start: usize, end: usize, line: &str, list: &
         }
     }
     line.replace(&line[start..end + 2], &parsed.concat())
+}
+
+fn replace_default_action(config: &Config, start: usize, end: usize, line: &str) -> String {
+    let default_action = config
+        .init
+        .as_ref()
+        .unwrap()
+        .xdp_action
+        .as_ref()
+        .unwrap_or(&"PASS".to_string())
+        .as_str()
+        .replace(" ", "");
+    match default_action.as_str() {
+        "pass" | "drop" => line.replace(
+            &line[start..end + 2],
+            &("XDP_".to_string() + &default_action.to_uppercase()),
+        ),
+        _ => {
+            println!(
+                "INFO: Unsupported XDP action: {}. Using default: PASS",
+                &default_action
+            );
+            line.replace(&line[start..end + 2], &("XDP_".to_string() + "PASS"))
+        }
+    }
 }

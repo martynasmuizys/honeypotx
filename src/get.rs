@@ -28,6 +28,7 @@ pub fn get_example_config(o: ConfOutputType) -> Result<(), anyhow::Error> {
             username: Some(String::from("bobthebuilder")),
             iface: Some(String::from("eth0")),
             prog_type: Some(String::from("ip")),
+            xdp_action: Some(String::from("PASS")),
             whitelist: Some(Whitelist {
                 enabled: Some(true),
                 max: Some(32),
@@ -75,6 +76,7 @@ pub fn get_base_config(o: ConfOutputType) -> Result<(), anyhow::Error> {
             username: None,
             iface: Some(String::from("lo")),
             prog_type: Some(String::from("ip")),
+            xdp_action: Some(String::from("PASS")),
             whitelist: Some(Whitelist {
                 enabled: Some(true),
                 max: Some(32),

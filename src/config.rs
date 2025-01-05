@@ -7,7 +7,7 @@ pub static DEFAULT_NET_IFACE: &str = "eth0";
 pub static DEFAULT_FREQUENCY: u32 = 1000;
 pub static DEFAULT_FAST_PACKETS: u32 = 100;
 
-static DEFAULT_NAME: &str = "ExampleProgram";
+pub static DEFAULT_NAME: &str = "ExampleProgram";
 static DEFAULT_MAX_IPS: u32 = 32;
 static DEFAULT_WHITELIST_ACTION: &str = "allow";
 static DEFAULT_BLACKLIST_ACTION: &str = "deny";
@@ -27,6 +27,7 @@ pub struct Init {
     pub username: Option<String>,
     pub iface: Option<String>,
     pub prog_type: Option<String>,
+    pub xdp_action: Option<String>,
     pub whitelist: Option<Whitelist>,
     pub blacklist: Option<Blacklist>,
     pub graylist: Option<Graylist>,
@@ -258,6 +259,7 @@ impl Default for Init {
             iface: Some(DEFAULT_NET_IFACE.to_string()),
             username: None,
             prog_type: Some("ip".to_string()),
+            xdp_action: Some("PASS".to_string()),
             whitelist: Some(Whitelist::default()),
             blacklist: Some(Blacklist::default()),
             graylist: Some(Graylist::default()),
