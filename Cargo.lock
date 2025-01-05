@@ -505,8 +505,8 @@ dependencies = [
  "crossterm",
  "home",
  "libbpf-rs",
+ "libbpf-sys",
  "mlua",
- "pkg-config",
  "pnet",
  "rodio",
  "rpassword",
@@ -627,9 +627,9 @@ dependencies = [
 
 [[package]]
 name = "libbpf-rs"
-version = "0.24.5"
+version = "0.25.0-beta.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bafb274d5b387bfe6e91e95b2481891c0cfcd7ee4bb48e992439becd0eb3e36c"
+checksum = "ad0b2c8f481a850c965da7642f3a844c6d32d7f8709b5afb74c5f6bff1e37582"
 dependencies = [
  "bitflags 2.6.0",
  "libbpf-sys",
@@ -639,9 +639,9 @@ dependencies = [
 
 [[package]]
 name = "libbpf-sys"
-version = "1.4.5+v1.4.5"
+version = "1.5.0+v1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5cabee52b6f7e73308d6fd4f8e6bbbdcb97670f49f6e581c5897e4d2410b6019"
+checksum = "2d8306b516a70a129cb6afed17c1e51e162d35aadfcc6339364addcebe32de90"
 dependencies = [
  "cc",
  "nix",
