@@ -41,7 +41,6 @@ int {{name}}(struct xdp_md *ctx) {
 
     // Extract source IP address
     __u32 src_ip = ip->saddr;
-    bpf_printk(\"packet\");
 
     {{whitelist_action}}
 
@@ -98,11 +97,12 @@ int {{name}}(struct xdp_md *ctx) {
       return XDP_PASS; // Bounds check for UDP header
     }
 
+    __u32 dst = ip->saddr;
+
     if (udp->dest != htons(53) && udp->source != htons(53)) {
       return XDP_PASS;
     }
     // Extract destination IP address
-    __u32 dest_ip = ip->daddr;
 
     {{whitelist_action}}
     {{blacklist_action}}
@@ -126,7 +126,7 @@ struct {
 
 /// Get ip/dns data
 pub static GET_DATA_IP: &str = "struct Data *{{list}}_data = bpf_map_lookup_elem(&{{list}}, &src_ip);";
-pub static GET_DATA_DNS: &str = "struct Data *{{list}}_data = bpf_map_lookup_elem(&{{list}}, &dest_ip);";
+pub static GET_DATA_DNS: &str = "struct Data *{{list}}_data = bpf_map_lookup_elem(&{{list}}, &dst);";
 
 /// Allow/Deny action (for whitelist/blacklist)
 pub static ACTION: &str = "if ({{list}}_data) {
