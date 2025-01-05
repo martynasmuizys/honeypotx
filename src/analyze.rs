@@ -2,7 +2,7 @@ use std::cell::SyncUnsafeCell;
 use std::io::{self, Read, Write};
 use std::net::TcpStream;
 use std::process::Command;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use anyhow::anyhow;
 use crossterm::style::{style, Stylize};
@@ -325,33 +325,37 @@ fn check_kernel_version_remote(session: &mut Session) -> Result<(), anyhow::Erro
 }
 
 fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::Error> {
-    let mut missing_pkgs: Vec<&str> = Vec::new();
-    let mut output = String::new();
+    let missing_pkgs: Arc<Mutex<Vec<&str>>> = Arc::new(Mutex::new(Vec::new()));
 
     match nodename {
         "ubuntu" => unsafe {
             for pkg in UBUNTU_PACKAGES {
-                output = String::from_utf8(
-                    Command::new("sh")
-                        .args(["-c", format!("apt -qq list {}", pkg).as_str()])
-                        .output()
-                        .unwrap()
-                        .stdout,
-                )?;
+                let missing_pkgs: Arc<Mutex<Vec<&str>>> = missing_pkgs.clone();
+                //let mut output = String::new();
+                tokio::spawn(async move {
+                    let output = String::from_utf8(
+                        tokio::process::Command::new("sh")
+                            .args(["-c", format!("apt -qq list {}", pkg).as_str()])
+                            .output().await
+                            .unwrap()
+                            .stdout,
+                    )
+                    .expect("Failed to get package");
 
-                if !output.contains("[installed]") {
-                    missing_pkgs.push(pkg);
-                } else {
-                    println!(
-                        "{}: Package \"{}\" is installed.",
-                        "Analyze".blue().bold(),
-                        pkg.bold()
-                    );
-                }
+                    if !output.contains("[installed]") {
+                        missing_pkgs.lock().unwrap().push(pkg);
+                    } else {
+                        println!(
+                            "{}: Package \"{}\" is installed.",
+                            "Analyze".blue().bold(),
+                            pkg.bold()
+                        );
+                    }
+                });
             }
         },
         "archlinux" => {
-            output = String::from_utf8(
+            let output = String::from_utf8(
                 Command::new("sh")
                     .args([
                         "-c",
@@ -364,7 +368,7 @@ fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::Error>
 
             for pkg in ARCH_PACKAGES {
                 if !output.contains(pkg) {
-                    missing_pkgs.push(pkg);
+                    missing_pkgs.lock().unwrap().push(pkg);
                 } else {
                     println!(
                         "{}: Package \"{}\" is installed.",
@@ -374,10 +378,10 @@ fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::Error>
                 }
             }
         }
-        _ => return Err(anyhow!("Unsupported OS: {}", output)),
+        _ => return Err(anyhow!("Unsupported OS")),
     }
 
-    missing_pkgs.iter_mut().for_each(|pkg| {
+    missing_pkgs.lock().unwrap().iter_mut().for_each(|pkg| {
         if *pkg == "linux-tools-generic" {
             let output =
                 String::from_utf8(Command::new("uname").arg("-r").output().unwrap().stdout)
@@ -386,13 +390,13 @@ fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::Error>
         }
     });
 
-    if !missing_pkgs.is_empty() {
+    if !missing_pkgs.lock().unwrap().is_empty() {
         if options.noconfirm.is_none() {
             let mut action = String::new();
             println!(
                 "{}: Missing packages:\n - {}",
                 "Analyze".blue(),
-                missing_pkgs.join("\n - ")
+                missing_pkgs.lock().unwrap().join("\n - ")
             );
             print!(
                 "{}: Attempt to install missing packages? [Y/n] ",
@@ -411,12 +415,14 @@ fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::Error>
                 );
                 unsafe {
                     let pkgs = MISSING_PACKAGES.get().as_mut().unwrap();
-                    pkgs.lock().unwrap().append(&mut missing_pkgs.clone());
+                    pkgs.lock()
+                        .unwrap()
+                        .append(&mut missing_pkgs.lock().unwrap().clone());
                 }
 
                 return Err(anyhow!(format!(
                     "Missing packages:\n - {}",
-                    missing_pkgs.join("\n - ")
+                    missing_pkgs.lock().unwrap().join("\n - ")
                 )));
             }
         }
@@ -424,7 +430,7 @@ fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::Error>
         println!(
             "{}: Installing missing packages:\n - {}\n",
             "Analyze".blue().bold(),
-            missing_pkgs.join("\n - ")
+            missing_pkgs.lock().unwrap().join("\n - ")
         );
         match nodename {
             "ubuntu" => {
@@ -432,7 +438,7 @@ fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::Error>
                     .arg("apt")
                     .arg("install")
                     .arg("--assume-yes")
-                    .arg(missing_pkgs.join(" "))
+                    .arg(missing_pkgs.lock().unwrap().join(" "))
                     .output()?;
             }
             "archlinux" => {
@@ -440,10 +446,10 @@ fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::Error>
                     .arg("pacman")
                     .arg("--noconfirm")
                     .arg("-S")
-                    .arg(missing_pkgs.join(" "))
+                    .arg(missing_pkgs.lock().unwrap().join(" "))
                     .output()?;
             }
-            _ => return Err(anyhow!("Unsupported OS: {}", output)),
+            _ => return Err(anyhow!("Unsupported OS")),
         }
         println!(
             "{}: Missing packages installed succefully.\n",
