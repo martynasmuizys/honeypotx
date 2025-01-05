@@ -35,7 +35,7 @@ int {{name}}(struct xdp_md *ctx) {
     if (data + sizeof(struct ethhdr) + sizeof(struct iphdr) > data_end)
         return XDP_PASS;
 
-    if((ip->protocol != IPPROTO_TCP) || (ip->protocol != IPPROTO_UDP)) {
+    if(ip->protocol != IPPROTO_TCP) {
         return XDP_PASS;
     }
 

@@ -23,7 +23,10 @@ use ssh2::Session;
 use tokio::signal;
 
 use crate::{
-    cli::Load, config::DEFAULT_NET_IFACE, maps::{self, load_map_data_local, load_map_data_local_temp, load_map_data_remote}, objects, programs, Config, SSH_PASS, WORKING_DIR
+    cli::Load,
+    config::{DEFAULT_NAME, DEFAULT_NET_IFACE},
+    maps::{self, load_map_data_local, load_map_data_local_temp, load_map_data_remote},
+    objects, programs, Config, SSH_PASS, WORKING_DIR,
 };
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -134,12 +137,8 @@ pub async fn load(options: &mut Load, config: Config) -> Result<usize, anyhow::E
 
         return Err(anyhow!("Cancelled"));
     } else if hostname.is_some() {
-        let tcp = TcpStream::connect(format!(
-            "{}:{}",
-            hostname.unwrap(),
-            port.unwrap_or(&22)
-        ))
-        .unwrap();
+        let tcp =
+            TcpStream::connect(format!("{}:{}", hostname.unwrap(), port.unwrap_or(&22))).unwrap();
         let mut session = Session::new().unwrap();
         session.set_tcp_stream(tcp);
         session.handshake().unwrap();
@@ -203,11 +202,12 @@ async fn load_local_temp(
     let whitelist = maps::get_map(&object, "whitelist");
     let blacklist = maps::get_map(&object, "blacklist");
     let graylist = maps::get_map(&object, "graylist");
-    let programs = programs::get_programs(&object).with_context(|| "Program not found".to_string())?;
+    let programs =
+        programs::get_programs(&object).with_context(|| "Program not found".to_string())?;
 
-    let name = config.init.as_ref().unwrap().name.as_ref().unwrap();
+    let name = config.init.as_ref().unwrap().name.as_ref();
     let program = programs
-        .get(name)
+        .get(name.unwrap_or(&DEFAULT_NAME.to_string()))
         .with_context(|| "Program does not exist".to_string())?;
     let xdp = programs::attach_xdp(program, options)?;
 
