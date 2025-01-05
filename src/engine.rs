@@ -498,8 +498,8 @@ fn replace_default_action(config: &Config, start: usize, end: usize, line: &str)
         .unwrap_or(&"PASS".to_string())
         .as_str()
         .replace(" ", "");
-    match default_action.as_str() {
-        "pass" | "drop" => line.replace(
+    match default_action.to_uppercase().as_str() {
+        "PASS" | "DROP" => line.replace(
             &line[start..end + 2],
             &("XDP_".to_string() + &default_action.to_uppercase()),
         ),

@@ -8,7 +8,7 @@ anyhow = "1.0.89"
 clap = { version = "4.5.19", features = ["derive"] }
 crossterm = "0.28.1"
 home = "0.5.9"
-libbpf-rs = { version = "0.25.0-beta.1", features = ["vendored"] }
+libbpf-rs = { version = "0.24.5", features = ["vendored"] }
 mlua = { version = "0.10.2", features = ["lua54", "async", "serialize", "vendored"] }
 pnet = "0.35.0"
 rodio = { version = "0.20.1", optional = true }
@@ -22,6 +22,3 @@ toml = "0.8.19"
 
 [features]
 secret-audio = ["dep:rodio"]
-
-[build-dependencies]
-libbpf-sys = { version = "1.5.0", features =  ["vendored"] }
