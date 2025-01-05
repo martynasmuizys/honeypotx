@@ -71,7 +71,7 @@ pub fn generator(options: Generate, config: Config) -> Result<(bool, String), an
         .arg(path)
         .arg("-o")
         .arg(compile_out)
-        .spawn()?;
+        .output()?;
     println!(
         "{}: Compiled eBPF program at: {}",
         "Generate".yellow().bold(),

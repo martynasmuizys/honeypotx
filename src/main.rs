@@ -61,11 +61,14 @@ async fn main() -> Result<(), anyhow::Error> {
     );
 
     if !working_dir.exists()
-        || !Path::new(format!("{}/out/vmlinux.h", working_dir.display()).as_str()).exists()
         || !Path::new(format!("{}/out/", working_dir.display()).as_str()).exists()
     {
         fs::create_dir_all(format!("{}/out", working_dir.display()))?;
         fs::create_dir(format!("{}/scripts", working_dir.display()))?;
+    }
+
+    // ENSURE CORRECT VMLINUX.H IS USED. DONT LIKE THIS APPROACH BUT UMM YEAH
+    if !Path::new(format!("{}/out/vmlinux.h", working_dir.display()).as_str()).exists() {
         Command::new("sh")
             .args([
                 "-c",
@@ -76,6 +79,30 @@ async fn main() -> Result<(), anyhow::Error> {
                 .as_str(),
             ])
             .output()?;
+    } else {
+        Command::new("sh")
+            .args([
+                "-c",
+                format!("bpftool btf dump file /sys/kernel/btf/vmlinux format c > /tmp/vmlinux.h",)
+                    .as_str(),
+            ])
+            .output()?;
+
+        let required = fs::read_to_string("/tmp/vmlinux.h")?;
+        let actual = fs::read_to_string(format!("{}/out/vmlinux.h", working_dir.display()))?;
+
+        if required.trim() != actual.trim() {
+            Command::new("sh")
+                .args([
+                    "-c",
+                    format!(
+                        "bpftool btf dump file /sys/kernel/btf/vmlinux format c > {}/out/vmlinux.h",
+                        working_dir.display()
+                    )
+                    .as_str(),
+                ])
+                .output()?;
+        }
     }
 
     let options = Options::parse();
