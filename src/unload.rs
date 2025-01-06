@@ -8,7 +8,7 @@ use crossterm::style::Stylize;
 use ssh2::Session;
 
 use crate::cli::Unload;
-use crate::config::DEFAULT_NET_IFACE;
+use crate::config::{DEFAULT_NAME, DEFAULT_NET_IFACE};
 use crate::{Config, SSH_PASS, WORKING_DIR};
 
 pub fn unload(options: &mut Unload, config: Config) -> Result<(), anyhow::Error> {
@@ -16,6 +16,20 @@ pub fn unload(options: &mut Unload, config: Config) -> Result<(), anyhow::Error>
     let port = config.init.as_ref().unwrap().port.as_ref();
 
     let config_iface = config.init.as_ref().unwrap().iface.as_ref();
+
+    if hostname.is_none()
+        || *hostname.as_ref().unwrap() == "localhost"
+        || *hostname.as_ref().unwrap() == "127.0.0.1"
+    {
+        match sudo::check() {
+            sudo::RunningAs::Root => (),
+            sudo::RunningAs::User => {
+                println!("{}: Requesting sudo privileges", "Unload".red().bold());
+                let _ = sudo::with_env(&["HOME"]);
+            }
+            sudo::RunningAs::Suid => todo!(),
+        }
+    }
 
     if config_iface.is_some()
         && !options.iface.is_empty()
@@ -53,15 +67,6 @@ pub fn unload(options: &mut Unload, config: Config) -> Result<(), anyhow::Error>
         || *hostname.as_ref().unwrap() == "localhost"
         || *hostname.as_ref().unwrap() == "127.0.0.1"
     {
-        match sudo::check() {
-            sudo::RunningAs::Root => (),
-            sudo::RunningAs::User => {
-                println!("{}: Requesting sudo privileges", "Unload".red().bold());
-                let _ = sudo::with_env(&["HOME"]);
-            }
-            sudo::RunningAs::Suid => todo!(),
-        }
-
         unload_local(options, config)?;
     } else if hostname.is_some() {
         let tcp = TcpStream::connect(format!(
@@ -123,7 +128,7 @@ pub fn unload(options: &mut Unload, config: Config) -> Result<(), anyhow::Error>
 }
 
 fn unload_local(options: &mut Unload, config: Config) -> Result<(), anyhow::Error> {
-    let name = config.init.as_ref().unwrap().name.as_ref().unwrap();
+    let name = config.init.as_ref().unwrap().name.as_ref();
     let xdp_flag = match options.xdp_flags.as_ref() {
         "generic" => "xdpgeneric",
         "native" => "xdpdrv",
@@ -140,7 +145,7 @@ fn unload_local(options: &mut Unload, config: Config) -> Result<(), anyhow::Erro
         .output()?;
 
     Command::new("rm")
-        .arg(format!("/sys/fs/bpf/{}", &name).as_str())
+        .arg(format!("/sys/fs/bpf/{}", &name.unwrap_or(&DEFAULT_NAME.to_string())).as_str())
         .output()?;
 
     let p = format!(

@@ -40,7 +40,14 @@ pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Resu
             let val = cfg.serialize(mlua::serde::Serializer::new(&lua))?;
             let json_data = serde_json::to_string(&val).map_err(mlua::Error::external)?;
             let config: Config = serde_json::from_str(&json_data).map_err(mlua::Error::external)?;
-            match analyze(Analyze {noconfirm: Some("".to_string())}, config).await {
+            match analyze(
+                Analyze {
+                    noconfirm: Some("".to_string()),
+                },
+                config,
+            )
+            .await
+            {
                 Ok(ret) => {
                     std::env::set_var("HPX_ANALYZED", "1");
                     Ok(ret)
@@ -59,7 +66,12 @@ pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Resu
                 let json_data = serde_json::to_string(&val).map_err(mlua::Error::external)?;
                 let config: Config =
                     serde_json::from_str(&json_data).map_err(mlua::Error::external)?;
-                match generator(Generate {noconfirm: Some("".to_string())}, config) {
+                match generator(
+                    Generate {
+                        noconfirm: Some("".to_string()),
+                    },
+                    config,
+                ) {
                     Ok(ret) => {
                         std::env::set_var("HPX_GENERATED", "1");
                         Ok(ret)
@@ -77,7 +89,13 @@ pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Resu
             let json_data = serde_json::to_string(&val).map_err(mlua::Error::external)?;
             let config: Config = serde_json::from_str(&json_data).map_err(mlua::Error::external)?;
 
-            check_sudo();
+            let hostname = config.init.as_ref().unwrap().hostname.as_ref();
+            if hostname.is_none()
+                || *hostname.as_ref().unwrap() == "localhost"
+                || *hostname.as_ref().unwrap() == "127.0.0.1"
+            {
+                check_sudo();
+            }
 
             match load(
                 &mut Load {
@@ -104,7 +122,13 @@ pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Resu
             let json_data = serde_json::to_string(&val).map_err(mlua::Error::external)?;
             let config: Config = serde_json::from_str(&json_data).map_err(mlua::Error::external)?;
 
-            check_sudo();
+            let hostname = config.init.as_ref().unwrap().hostname.as_ref();
+            if hostname.is_none()
+                || *hostname.as_ref().unwrap() == "localhost"
+                || *hostname.as_ref().unwrap() == "127.0.0.1"
+            {
+                check_sudo();
+            }
 
             match unload(
                 &mut Unload {
@@ -129,16 +153,22 @@ pub async fn run_script(work_dir: &str, script_path: Option<&str>) -> mlua::Resu
             let json_data = serde_json::to_string(&val).map_err(mlua::Error::external)?;
             let config: Config = serde_json::from_str(&json_data).map_err(mlua::Error::external)?;
 
-            check_sudo();
-
+            let hostname = config.init.as_ref().unwrap().hostname.as_ref();
+            if hostname.is_none()
+                || *hostname.as_ref().unwrap() == "localhost"
+                || *hostname.as_ref().unwrap() == "127.0.0.1"
+            {
+                check_sudo();
+            }
             match get_map_data(&config, &map_name.to_string_lossy()) {
                 Ok(ret) => {
                     let json: JsonValue =
-                        serde_json::from_str(&ret).map_err(mlua::Error::external)?;
+                    serde_json::from_str(&ret).map_err(mlua::Error::external)?;
                     Ok(lua.to_value(&json)?)
                 }
                 Err(e) => Err(mlua::Error::runtime(e)),
             }
+
         })?;
 
         lua.globals().set("analyze", analyze_func)?;
@@ -160,7 +190,7 @@ fn check_sudo() {
     match sudo::check() {
         sudo::RunningAs::Root => (),
         sudo::RunningAs::User => {
-            println!("{}: Requesting sudo privileges", "Unload".red().bold());
+            println!("{}: Requesting sudo privileges", "Lua".red().bold());
             let _ = sudo::with_env(&["HOME", "HPX_ANALYZED", "HPX_GENERATED"]);
         }
         sudo::RunningAs::Suid => (),

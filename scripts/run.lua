@@ -3,8 +3,9 @@ local config = {
         name = "hpx",
         hostname = "193.219.91.103",
         port = 10033,
+        username = "mamu8341",
         iface = "lo",
-        prog_type = "ip",
+        prog_type = "dns",
         whitelist = {
             enabled = true,
         },
@@ -24,24 +25,24 @@ local config = {
 
 analyze({config})
 
--- local done, out = generate({config})
+local done, out = generate({config})
 -- if done then
 --     print("──────────────────────────")
 --     print("eBPF program generated at:", out)
 --     print("──────────────────────────\n")
 -- end
 --
--- local opts = {config, "lo", "generic"};
--- local id = pload(opts)
--- print("Program id:", id)
--- local data = get_map_data({config, "blacklist"})
--- local last_ip = ""
--- for k, v in pairs(data[#data]["key"]) do
---     if k == #data[#data]["key"] then
---         last_ip = last_ip .. tonumber(v)
---     else
---         last_ip = last_ip .. tonumber(v) .. "."
---     end
--- end
--- print("Random banned IP:", last_ip)
--- punload({config, "lo", "generic", id})
+local opts = {config, "lo", "generic"};
+local id = pload(opts)
+print("Program id:", id)
+local data = get_map_data({config, "blacklist"})
+local last_ip = ""
+for k, v in pairs(data[#data]["key"]) do
+    if k == #data[#data]["key"] then
+        last_ip = last_ip .. tonumber(v)
+    else
+        last_ip = last_ip .. tonumber(v) .. "."
+    end
+end
+print("Random banned IP:", last_ip)
+punload({config, "lo", "generic", id})

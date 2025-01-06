@@ -333,7 +333,7 @@ async fn load_local_temp(
 }
 
 fn load_local(options: &mut Load, config: Config, path: &str) -> Result<usize, anyhow::Error> {
-    let name = config.init.as_ref().unwrap().name.as_ref().unwrap();
+    let name = config.init.as_ref().unwrap().name.as_ref();
     let xdp_flag = match options.xdp_flags.as_ref() {
         "generic" => "xdpgeneric",
         "native" => "xdpdrv",
@@ -346,7 +346,10 @@ fn load_local(options: &mut Load, config: Config, path: &str) -> Result<usize, a
         .arg("prog")
         .arg("load")
         .arg(path)
-        .arg(format!("/sys/fs/bpf/{}", name))
+        .arg(format!(
+            "/sys/fs/bpf/{}",
+            name.unwrap_or(&DEFAULT_NAME.to_string())
+        ))
         .output()?;
 
     let output = String::from_utf8(
@@ -362,15 +365,21 @@ fn load_local(options: &mut Load, config: Config, path: &str) -> Result<usize, a
     let progs: Value = serde_json::from_str(&output)?;
     if let Some(progs) = progs.as_array() {
         for p in progs {
-            if *name == p["name"] {
-                prog_id = p["id"]
-                    .as_u64()
-                    .with_context(|| format!("Program {} was not loaded", &name))?;
+            if *name.unwrap_or(&DEFAULT_NAME.to_string()) == p["name"] {
+                prog_id = p["id"].as_u64().with_context(|| {
+                    format!(
+                        "Program {} was not loaded",
+                        &name.unwrap_or(&DEFAULT_NAME.to_string())
+                    )
+                })?;
                 break;
             }
         }
     } else {
-        return Err(anyhow!("Program {} was not loaded", &name));
+        return Err(anyhow!(
+            "Program {} was not loaded",
+            &name.unwrap_or(&DEFAULT_NAME.to_string())
+        ));
     }
 
     let output = String::from_utf8(
@@ -389,6 +398,7 @@ fn load_local(options: &mut Load, config: Config, path: &str) -> Result<usize, a
     if let Some(maps) = maps.as_array() {
         for m in maps {
             if "whitelist" == m["name"]
+                && config.data.as_ref().is_some()
                 && config.data.as_ref().unwrap().whitelist.as_ref().is_some()
             {
                 let wid = m["id"]
@@ -409,6 +419,7 @@ fn load_local(options: &mut Load, config: Config, path: &str) -> Result<usize, a
                 continue;
             }
             if "blacklist" == m["name"]
+                && config.data.as_ref().is_some()
                 && config.data.as_ref().unwrap().blacklist.as_ref().is_some()
             {
                 let bid = m["id"]
@@ -428,7 +439,9 @@ fn load_local(options: &mut Load, config: Config, path: &str) -> Result<usize, a
                 });
                 continue;
             }
-            if "graylist" == m["name"] && config.data.as_ref().unwrap().graylist.as_ref().is_some()
+            if "graylist" == m["name"]
+                && config.data.as_ref().is_some()
+                && config.data.as_ref().unwrap().graylist.as_ref().is_some()
             {
                 let gid = m["id"]
                     .as_u64()
@@ -449,7 +462,10 @@ fn load_local(options: &mut Load, config: Config, path: &str) -> Result<usize, a
             }
         }
     } else {
-        return Err(anyhow!("Program {} was not loaded", &name));
+        return Err(anyhow!(
+            "Program {} was not loaded",
+            &name.unwrap_or(&DEFAULT_NAME.to_string())
+        ));
     }
 
     Command::new("bpftool")
@@ -510,7 +526,7 @@ fn send_file(
 
     println!("{}: Sending compiled eBPF program...", "Load".red().bold());
     let mut channel = session
-        .scp_send(Path::new(&path), 0o644, size, None)
+        .scp_send(Path::new("/tmp/generated.o"), 0o644, size, None)
         .unwrap();
     channel.write_all(&file_contents)?;
     channel.send_eof()?;
@@ -523,7 +539,7 @@ fn send_file(
     channel.exec(
         format!(
             "echo {} | sudo -S bpftool prog load {} /sys/fs/bpf/{}",
-            password, path, name
+            password, "/tmp/generated.o", name
         )
         .as_str(),
     )?;
@@ -578,6 +594,7 @@ fn load_remote(
     if let Some(maps) = maps.as_array() {
         for m in maps {
             if "whitelist" == m["name"]
+                && config.data.as_ref().is_some()
                 && config.data.as_ref().unwrap().whitelist.as_ref().is_some()
             {
                 let wid = m["id"]
@@ -600,6 +617,7 @@ fn load_remote(
                 continue;
             }
             if "blacklist" == m["name"]
+                && config.data.as_ref().is_some()
                 && config.data.as_ref().unwrap().blacklist.as_ref().is_some()
             {
                 let bid = m["id"]
@@ -621,7 +639,9 @@ fn load_remote(
                 });
                 continue;
             }
-            if "graylist" == m["name"] && config.data.as_ref().unwrap().graylist.as_ref().is_some()
+            if "graylist" == m["name"]
+                && config.data.as_ref().is_some()
+                && config.data.as_ref().unwrap().graylist.as_ref().is_some()
             {
                 let gid = m["id"]
                     .as_u64()

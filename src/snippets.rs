@@ -11,7 +11,7 @@ struct Data {
     __u64 last_access_ns;
 };
 
-static __u64 MS_IN_NS = 100000;
+static __u64 MS_IN_NS = 1000000;
 
 {{whitelist_map}}
 

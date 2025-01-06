@@ -76,7 +76,7 @@ pub fn load_map_data_remote(
         let mut value = key.clone();
         let mut empty_data: Vec<&str> = vec![
             "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0",
-            "0", "0", "0",
+            "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0"
         ];
         value.append(&mut empty_data);
 
@@ -164,7 +164,7 @@ pub fn get_map_data(config: &Config, map_name: &str) -> Result<String, anyhow::E
                 .as_ref()
                 .unwrap()
                 .to_string();
-            println!("{}: Using username \"{}\"", "Load".red().bold(), &username);
+            println!("{}: Using username \"{}\"", "Map Data".green().bold(), &username);
         }
 
         let password: String;
@@ -187,12 +187,9 @@ pub fn get_map_data(config: &Config, map_name: &str) -> Result<String, anyhow::E
             }
         }
 
-        session
-            .userauth_password(username.trim(), password.trim())
-            .unwrap();
         println!(
             "{}: Connected to {}\n",
-            "Load".red().bold(),
+            "Map Load".green().bold(),
             hostname.unwrap()
         );
 

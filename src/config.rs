@@ -76,7 +76,7 @@ impl Display for Config {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "├─ Hostname: {}\n├─ Port: {}\n├─ Username: {}\n├─ Network Interface: {}\n├─ eBPF Program Type: {} \n├─ eBPF Program Name: {}\n├─ Maps:\n├─── {}: \n{}├─── {}: \n{}└─── {}: \n{}",
+            "├─ Hostname: {}\n├─ Port: {}\n├─ Username: {}\n├─ Network Interface: {}\n├─ eBPF Program Type: {}\n├─ eBPF Program Type: {} \n├─ eBPF Program Name: {}\n├─ Maps:\n├─── {}: \n{}├─── {}: \n{}└─── {}: \n{}",
             self.init
                 .as_ref()
                 .unwrap()
@@ -120,6 +120,15 @@ impl Display for Config {
                 .as_ref()
                 .unwrap_or(&"ip".to_string())
                 .to_uppercase()
+                .as_str()
+                .green()
+                .bold(),
+            self.init
+                .as_ref()
+                .unwrap()
+                .xdp_action
+                .as_ref()
+                .unwrap_or(&"pass".to_string())
                 .as_str()
                 .green()
                 .bold(),

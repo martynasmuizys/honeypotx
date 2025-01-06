@@ -10,10 +10,11 @@ use ssh2::Session;
 
 use crate::cli::Analyze;
 use crate::config::Config;
+use crate::SSH_PASS;
 
 static MIN_KERNEL_VERSION: &str = "5.17.0";
-static mut UBUNTU_PACKAGES: [&str; 3] = ["linux-tools-common", "linux-tools-generic", "ripgrep"];
-static ARCH_PACKAGES: [&str; 4] = ["bpf", "base", "base-devel", "ripgrep"];
+static mut UBUNTU_PACKAGES: [&str; 4] = ["linux-tools-common", "linux-tools-generic", "ripgrep", "clang"];
+static ARCH_PACKAGES: [&str; 5] = ["bpf", "base", "base-devel", "ripgrep", "clang"];
 
 static MISSING_PACKAGES: SyncUnsafeCell<Mutex<Vec<&str>>> =
     SyncUnsafeCell::new(Mutex::new(Vec::new()));
@@ -157,10 +158,26 @@ pub async fn analyze(options: Analyze, config: Config) -> Result<bool, anyhow::E
             );
         }
 
-        let password = rpassword::prompt_password("Password: ").unwrap();
-        session
-            .userauth_password(username.trim(), password.trim())
-            .unwrap();
+        let password: String;
+        unsafe {
+            let pass = (*SSH_PASS.get()).lock().unwrap();
+            if !pass.is_empty() {
+                password = (*pass).clone();
+            } else {
+                password = rpassword::prompt_password("Password: ")?;
+            }
+        }
+
+        session.userauth_password(username.trim(), password.trim())?;
+
+        unsafe {
+            let pass = (*SSH_PASS.get()).lock().unwrap();
+            if pass.is_empty() {
+                let new = SSH_PASS.get().as_mut().unwrap();
+                *new = Mutex::new(password.clone());
+            }
+        }
+
         println!(
             "{}: Connected to {}\n",
             "Analyze".blue().bold(),
