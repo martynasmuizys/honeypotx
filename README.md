@@ -13,11 +13,11 @@ HoneypotX is a highly configurable new generation type of honeypot generator too
 ### Cargo
 First make sure [Rust](https://github.com/rust-lang/rust) toolchain is installed (it is recommened to use [rustup](https://rustup.rs/) installation method). For now installation uses Nightly toolchain.
 ```bash
-cargo +nightly install --git https://github.com/martynasmuizys/hpx.git
+cargo +nightly install --git https://github.com/martynasmuizys/honeypotx.git
 ```
 ### Manually
 ```bash
-git clone https://github.com/martynasmuizys/hpx.git
+git clone https://github.com/martynasmuizys/honeypotx.git
 cd hpx
 make install
 ```
