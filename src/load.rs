@@ -225,40 +225,46 @@ async fn load_local_temp(
     stdout().execute(EnterAlternateScreen)?;
 
     if let Some(wl) = &whitelist {
-        load_map_data_local_temp(
-            wl,
-            &config
-                .data
-                .as_ref()
-                .unwrap()
-                .whitelist
-                .clone()
-                .unwrap_or_default(),
-        )?
+        if config.data.is_some() {
+            load_map_data_local_temp(
+                wl,
+                &config
+                    .data
+                    .as_ref()
+                    .unwrap()
+                    .whitelist
+                    .clone()
+                    .unwrap_or_default(),
+            )?
+        }
     }
     if let Some(bl) = &blacklist {
-        load_map_data_local_temp(
-            bl,
-            &config
-                .data
-                .as_ref()
-                .unwrap()
-                .blacklist
-                .clone()
-                .unwrap_or_default(),
-        )?
+        if config.data.is_some() {
+            load_map_data_local_temp(
+                bl,
+                &config
+                    .data
+                    .as_ref()
+                    .unwrap()
+                    .blacklist
+                    .clone()
+                    .unwrap_or_default(),
+            )?
+        }
     }
     if let Some(gl) = &graylist {
-        load_map_data_local_temp(
-            gl,
-            &config
-                .data
-                .as_ref()
-                .unwrap()
-                .graylist
-                .clone()
-                .unwrap_or_default(),
-        )?
+        if config.data.is_some() {
+            load_map_data_local_temp(
+                gl,
+                &config
+                    .data
+                    .as_ref()
+                    .unwrap()
+                    .graylist
+                    .clone()
+                    .unwrap_or_default(),
+            )?
+        }
     }
 
     while !(*should_terminate.lock().unwrap()) {
