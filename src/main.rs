@@ -156,7 +156,7 @@ async fn main() -> Result<(), anyhow::Error> {
             let prog_id = load(&mut options, config).await?;
 
             if prog_id != 0 {
-                print!("{}: Program ID - {prog_id}", "Load".red().bold());
+                println!("{}: Program ID - {prog_id}", "Load".red().bold());
             }
         }
         Commands::Unload(mut options) => unload(&mut options, config)?,
