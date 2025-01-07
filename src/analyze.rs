@@ -351,8 +351,14 @@ async fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::
 
     match nodename {
         "ubuntu" => unsafe {
-            let tasks = UBUNTU_PACKAGES.map(|pkg| {
+            let tasks = UBUNTU_PACKAGES.map(|mut pkg| {
                 let missing_pkgs: Arc<Mutex<Vec<&str>>> = missing_pkgs.clone();
+                if pkg == "linux-tools-generic" {
+                    let output =
+                        String::from_utf8(Command::new("uname").arg("-r").output().unwrap().stdout)
+                            .unwrap();
+                    pkg = ("linux-tools-".to_string() + output.leak()).leak().trim();
+                }
                 tokio::spawn(async move {
                     let output = String::from_utf8(
                         tokio::process::Command::new("sh")
@@ -405,15 +411,6 @@ async fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::
         }
         _ => return Err(anyhow!("Unsupported OS")),
     }
-
-    missing_pkgs.lock().unwrap().iter_mut().for_each(|pkg| {
-        if *pkg == "linux-tools-generic" {
-            let output =
-                String::from_utf8(Command::new("uname").arg("-r").output().unwrap().stdout)
-                    .unwrap();
-            *pkg = ("linux-tools-".to_string() + output.leak()).leak().trim();
-        }
-    });
 
     if !missing_pkgs.lock().unwrap().is_empty() {
         if options.noconfirm.is_none() {
