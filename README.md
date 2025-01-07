@@ -22,7 +22,7 @@ cd hpx
 make install
 ```
 
-### Usage
+## Usage
 The binary is named `hpx`. You can run `hpx help` to list all possible commands.
 
 Here is some examples:
