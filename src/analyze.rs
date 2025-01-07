@@ -13,13 +13,14 @@ use crate::config::Config;
 use crate::SSH_PASS;
 
 static MIN_KERNEL_VERSION: &str = "5.17.0";
-static mut UBUNTU_PACKAGES: [&str; 4] = [
+static mut UBUNTU_PACKAGES: [&str; 5] = [
     "linux-tools-common",
     "linux-tools-generic",
     "ripgrep",
     "clang",
+    "libbpf-dev"
 ];
-static ARCH_PACKAGES: [&str; 5] = ["bpf", "base", "base-devel", "ripgrep", "clang"];
+static ARCH_PACKAGES: [&str; 6] = ["bpf", "libbpf", "base", "base-devel", "ripgrep", "clang"];
 
 static MISSING_PACKAGES: SyncUnsafeCell<Mutex<Vec<&str>>> =
     SyncUnsafeCell::new(Mutex::new(Vec::new()));
