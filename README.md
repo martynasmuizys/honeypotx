@@ -31,6 +31,10 @@ hpx analyze -c path/to/config # Analyzes system's compatibility with eBPF
 
 hpx generate -c path/to/config # Generates eBPF program based on the configuration
 
+hpx load -c path/to/config # Loads eBPF program into kernel
+
+hpx unload -c path/to/config # Unoads eBPF program from kernel
+
 hpx get base-config # Get starter config
 
 hpx get example-config # Get example config
