@@ -13,7 +13,12 @@ use crate::config::Config;
 use crate::SSH_PASS;
 
 static MIN_KERNEL_VERSION: &str = "5.17.0";
-static mut UBUNTU_PACKAGES: [&str; 4] = ["linux-tools-common", "linux-tools-generic", "ripgrep", "clang"];
+static mut UBUNTU_PACKAGES: [&str; 4] = [
+    "linux-tools-common",
+    "linux-tools-generic",
+    "ripgrep",
+    "clang",
+];
 static ARCH_PACKAGES: [&str; 5] = ["bpf", "base", "base-devel", "ripgrep", "clang"];
 
 static MISSING_PACKAGES: SyncUnsafeCell<Mutex<Vec<&str>>> =
@@ -347,13 +352,13 @@ async fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::
     match nodename {
         "ubuntu" => unsafe {
             let tasks = UBUNTU_PACKAGES.map(|pkg| {
-
                 let missing_pkgs: Arc<Mutex<Vec<&str>>> = missing_pkgs.clone();
                 tokio::spawn(async move {
                     let output = String::from_utf8(
                         tokio::process::Command::new("sh")
                             .args(["-c", format!("apt -qq list {}", pkg).as_str()])
-                            .output().await
+                            .output()
+                            .await
                             .unwrap()
                             .stdout,
                     )
@@ -454,14 +459,18 @@ async fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::
         );
         match nodename {
             "ubuntu" => {
-                Command::new("sudo")
-                    .arg("apt")
-                    .arg("install")
-                    .arg("--assume-yes")
-                    .arg(missing_pkgs.lock().unwrap().join(" "))
-                    .output()?;
+                println!("{}: please wait...", "analyze".blue().bold(),);
+                Command::new("sh").args([
+                    "-c",
+                    format!(
+                        "sudo apt install --assume-yes {}",
+                        missing_pkgs.lock().unwrap().join(" ")
+                    )
+                    .as_str(),
+                ]);
             }
             "archlinux" => {
+                println!("{}: please wait...", "analyze".blue().bold(),);
                 Command::new("sudo")
                     .arg("pacman")
                     .arg("--noconfirm")
