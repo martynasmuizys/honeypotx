@@ -6,18 +6,19 @@
         "username": "bobthebuilder",
         "iface": "eth0",
         "prog_type": "ip",
+        "xdp_action": "pass",
         "whitelist": {
-            "enabled": false,
+            "enabled": true,
             "max": 32,
             "action": "allow"
         },
         "blacklist": {
-            "enabled": false,
+            "enabled": true,
             "max": 32,
             "action": "deny"
         },
         "graylist": {
-            "enabled": false,
+            "enabled": true,
             "max": 32,
             "action": "investigate",
             "frequency": 1000,

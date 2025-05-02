@@ -160,3 +160,7 @@ pub static GRAYLIST: &str = "if ({{list}}_data) {
     bpf_map_update_elem(&{{list}}, &src_ip, &new, BPF_NOEXIST);
 }
 ";
+
+static test: &str = "
+sadsad
+";

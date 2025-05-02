@@ -20,7 +20,7 @@ static mut UBUNTU_PACKAGES: [&str; 5] = [
     "clang",
     "libbpf-dev"
 ];
-static ARCH_PACKAGES: [&str; 6] = ["bpf", "libbpf", "base", "base-devel", "ripgrep", "clang"];
+static ARCH_PACKAGES: [&str; 5] = ["bpf", "base", "base-devel", "ripgrep", "clang"];
 
 static MISSING_PACKAGES: SyncUnsafeCell<Mutex<Vec<&str>>> =
     SyncUnsafeCell::new(Mutex::new(Vec::new()));
@@ -457,7 +457,7 @@ async fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::
         );
         match nodename {
             "ubuntu" => {
-                println!("{}: please wait...", "analyze".blue().bold(),);
+                println!("{}: please wait...", "Analyze".blue().bold(),);
                 Command::new("sh").args([
                     "-c",
                     format!(
@@ -468,7 +468,7 @@ async fn check_packages(options: Analyze, nodename: &str) -> Result<(), anyhow::
                 ]);
             }
             "archlinux" => {
-                println!("{}: please wait...", "analyze".blue().bold(),);
+                println!("{}: please wait...", "Analyze".blue().bold(),);
                 Command::new("sudo")
                     .arg("pacman")
                     .arg("--noconfirm")

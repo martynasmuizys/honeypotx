@@ -112,7 +112,7 @@ pub fn get_base_config(o: ConfOutputType) -> Result<(), anyhow::Error> {
 pub fn get_lua_api() {
     println!(
         "{}(opts) - analyzes systems compatibility with eBPF",
-        "analyze".bold().blue()
+        "Analyze".bold().blue()
     );
     println!(
         "{}(opts) - generates eBPF program on provided config",

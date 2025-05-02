@@ -1,9 +1,6 @@
 local config = {
     init = {
         name = "hpx",
-        hostname = "193.219.91.103",
-        port = 10033,
-        username = "mamu8341",
         iface = "lo",
         prog_type = "dns",
         whitelist = {
@@ -19,11 +16,11 @@ local config = {
         }
     },
     data = {
-        blacklist = { "127.0.0.1", "127.0.0.2", "128.0.1.2" }
+        blacklist = { "127.0.0.4", "127.0.0.2", "128.0.1.2" }
     }
 }
 
-analyze({config})
+-- analyze({config})
 
 local done, out = generate({config})
 -- if done then
@@ -34,15 +31,11 @@ local done, out = generate({config})
 --
 local opts = {config, "lo", "generic"};
 local id = pload(opts)
-print("Program id:", id)
-local data = get_map_data({config, "blacklist"})
-local last_ip = ""
-for k, v in pairs(data[#data]["key"]) do
-    if k == #data[#data]["key"] then
-        last_ip = last_ip .. tonumber(v)
-    else
-        last_ip = last_ip .. tonumber(v) .. "."
-    end
-end
-print("Random banned IP:", last_ip)
+local json = require 'json'
+local data = json.encode(get_map_data({config, "blacklist"}))
+
+local cmd = "curl -X POST -d '" .. tostring(data) .. "' http://localhost:8080/log"
+
+os.execute(cmd)
+
 punload({config, "lo", "generic", id})
